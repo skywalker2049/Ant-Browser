@@ -224,6 +224,7 @@ export async function createBrowserProfile(input: BrowserProfileInput): Promise<
     profileId: `mock-${Date.now()}`,
     ...input,
     keywords: input.keywords || [],
+    remoteDebugEnabled: input.remoteDebugEnabled === true,
     running: false,
     debugPort: 0,
     debugReady: false,

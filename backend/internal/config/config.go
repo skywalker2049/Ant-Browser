@@ -252,6 +252,7 @@ type BrowserProfileConfig struct {
 	LaunchArgs         []string `yaml:"launch_args" json:"launchArgs"`
 	Tags               []string `yaml:"tags" json:"tags"`
 	Keywords           []string `yaml:"keywords,omitempty" json:"keywords,omitempty"`
+	RemoteDebugEnabled bool     `yaml:"remote_debug_enabled,omitempty" json:"remoteDebugEnabled,omitempty"`
 	CreatedAt          string   `yaml:"created_at" json:"createdAt"`
 	UpdatedAt          string   `yaml:"updated_at" json:"updatedAt"`
 }

@@ -40,6 +40,7 @@ func normalizeProfileInput(input browser.ProfileInput) browser.ProfileInput {
 		Tags:               normalizeStringSlice(input.Tags),
 		Keywords:           normalizeStringSlice(input.Keywords),
 		GroupId:            strings.TrimSpace(input.GroupId),
+		RemoteDebugEnabled: input.RemoteDebugEnabled,
 	}
 }
 
@@ -60,6 +61,7 @@ func profileToInput(profile *browser.Profile) browser.ProfileInput {
 		Tags:               append([]string{}, profile.Tags...),
 		Keywords:           append([]string{}, profile.Keywords...),
 		GroupId:            strings.TrimSpace(profile.GroupId),
+		RemoteDebugEnabled: profile.RemoteDebugEnabled,
 	}
 }
 

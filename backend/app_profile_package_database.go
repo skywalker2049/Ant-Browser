@@ -1029,8 +1029,8 @@ func insertProfilePackageProfile(tx *sql.Tx, profile browser.Profile) error {
 		INSERT INTO browser_profiles (
 			profile_id, profile_name, user_data_dir, core_id, fingerprint_args, proxy_id, proxy_config,
 			proxy_bind_source_id, proxy_bind_source_url, proxy_bind_name, proxy_bind_updated_at, memory_limit_mb,
-			launch_args, tags, keywords, group_id, created_at, updated_at, restore_last_session, deleted_at
-		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+			launch_args, tags, keywords, group_id, remote_debug_enabled, created_at, updated_at, restore_last_session, deleted_at
+		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 		ON CONFLICT(profile_id) DO UPDATE SET
 			profile_name = excluded.profile_name,
 			user_data_dir = excluded.user_data_dir,
@@ -1047,13 +1047,14 @@ func insertProfilePackageProfile(tx *sql.Tx, profile browser.Profile) error {
 			tags = excluded.tags,
 			keywords = excluded.keywords,
 			group_id = excluded.group_id,
+			remote_debug_enabled = excluded.remote_debug_enabled,
 			created_at = excluded.created_at,
 			updated_at = excluded.updated_at,
 			restore_last_session = excluded.restore_last_session,
 			deleted_at = excluded.deleted_at`,
 		profile.ProfileId, profile.ProfileName, profile.UserDataDir, profile.CoreId, string(fingerprintArgs), profile.ProxyId,
 		profile.ProxyConfig, profile.ProxyBindSourceID, profile.ProxyBindSourceURL, profile.ProxyBindName,
-		profile.ProxyBindUpdatedAt, profile.MemoryLimitMB, string(launchArgs), string(tags), string(keywords), profile.GroupId,
+		profile.ProxyBindUpdatedAt, profile.MemoryLimitMB, string(launchArgs), string(tags), string(keywords), profile.GroupId, profile.RemoteDebugEnabled,
 		createdAt, updatedAt, profile.RestoreLastSession, profile.DeletedAt,
 	)
 	if err != nil {

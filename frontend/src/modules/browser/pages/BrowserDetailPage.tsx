@@ -19,10 +19,11 @@ import { SnapshotTab } from '../components/SnapshotTab'
 import { resolveActionErrorMessage, resolveActionFeedback } from '../utils/actionErrors'
 import { warmupProfileProxyBeforeStart } from '../utils/proxyWarmup'
 
-const resolveRuntimeStatus = (running: boolean, debugReady: boolean, lastError = '') => {
-  if (!running && lastError.trim()) return { variant: 'error' as const, label: '异常' }
-  if (!running) return { variant: 'default' as const, label: '已停止' }
-  if (!debugReady) return { variant: 'info' as const, label: '运行中（待就绪）' }
+const resolveRuntimeStatus = (running: boolean, debugReady: boolean, remoteDebugEnabled: boolean, lastError = '') => {
+	if (!running && lastError.trim()) return { variant: 'error' as const, label: '异常' }
+	if (!running) return { variant: 'default' as const, label: '已停止' }
+	if (!remoteDebugEnabled) return { variant: 'success' as const, label: '运行中' }
+	if (!debugReady) return { variant: 'info' as const, label: '运行中（待就绪）' }
   return { variant: 'success' as const, label: '运行中' }
 }
 
@@ -139,7 +140,7 @@ export function BrowserDetailPage() {
       if (startedProfile) {
         setProfile(startedProfile)
       }
-      if (startedProfile?.runtimeWarning || (startedProfile?.running && !startedProfile.debugReady)) {
+      if (startedProfile?.runtimeWarning || (startedProfile?.running && startedProfile.remoteDebugEnabled && !startedProfile.debugReady)) {
         toast.warning(startedProfile.runtimeWarning || '浏览器窗口已启动，调试接口仍在后台接管。')
       }
     } catch (error: any) {
@@ -178,7 +179,7 @@ export function BrowserDetailPage() {
       if (restartedProfile) {
         setProfile(restartedProfile)
       }
-      if (restartedProfile?.runtimeWarning || (restartedProfile?.running && !restartedProfile.debugReady)) {
+      if (restartedProfile?.runtimeWarning || (restartedProfile?.running && restartedProfile.remoteDebugEnabled && !restartedProfile.debugReady)) {
         toast.warning(restartedProfile.runtimeWarning || '浏览器窗口已启动，调试接口仍在后台接管。')
       }
     } catch (error: any) {
@@ -210,7 +211,7 @@ export function BrowserDetailPage() {
   const isStopping = pendingAction === 'stopping'
   const isRestarting = pendingAction === 'restarting'
   const isBusy = pendingAction !== null
-  const runtimeStatus = resolveRuntimeStatus(profile.running, profile.debugReady, profile.lastError)
+  const runtimeStatus = resolveRuntimeStatus(profile.running, profile.debugReady, profile.remoteDebugEnabled, profile.lastError)
 
   return (
     <div className="space-y-4 animate-fade-in">
@@ -265,12 +266,12 @@ export function BrowserDetailPage() {
                   <span>{profile.pid || '-'}</span>
                 </div>
                 <div className="flex justify-between">
-                  <span>调试端口</span>
-                  <span>{profile.debugPort || '-'}</span>
+						<span>远程调试</span>
+						<span>{profile.remoteDebugEnabled ? (profile.debugPort || '-') : '未开启'}</span>
                 </div>
                 <div className="flex justify-between">
-                  <span>调试状态</span>
-                  <span>{profile.debugReady ? '已就绪' : (profile.running ? '等待就绪' : '-')}</span>
+						<span>调试状态</span>
+						<span>{!profile.remoteDebugEnabled ? '未开启' : (profile.debugReady ? '已就绪' : (profile.running ? '等待就绪' : '-'))}</span>
                 </div>
                 <div className="flex justify-between">
                   <span>最近启动</span>
@@ -397,7 +398,7 @@ export function BrowserDetailPage() {
             profileId={profile.profileId}
             profileName={profile.profileName}
             running={profile.running}
-            ready={profile.running && profile.debugReady}
+            ready={profile.running && profile.remoteDebugEnabled && profile.debugReady}
           />
         </div>
       )}

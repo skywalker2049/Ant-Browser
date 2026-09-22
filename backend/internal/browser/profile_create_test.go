@@ -54,6 +54,25 @@ func TestCreateNormalizesRestoreLastSessionMode(t *testing.T) {
 	}
 }
 
+func TestCreateRemoteDebugDisabledByDefaultAndCanBeEnabled(t *testing.T) {
+	manager := NewManager(&config.Config{}, t.TempDir())
+	profile, err := manager.Create(ProfileInput{ProfileName: "default-debug"})
+	if err != nil {
+		t.Fatalf("Create returned error: %v", err)
+	}
+	if profile.RemoteDebugEnabled {
+		t.Fatal("RemoteDebugEnabled = true, want false by default")
+	}
+
+	updated, err := manager.Update(profile.ProfileId, ProfileInput{ProfileName: profile.ProfileName, RemoteDebugEnabled: true})
+	if err != nil {
+		t.Fatalf("Update returned error: %v", err)
+	}
+	if !updated.RemoteDebugEnabled {
+		t.Fatal("RemoteDebugEnabled = false, want true after update")
+	}
+}
+
 func TestUpdateRejectsRunningProfile(t *testing.T) {
 	manager := NewManager(&config.Config{}, t.TempDir())
 	profile, err := manager.Create(ProfileInput{ProfileName: "running"})

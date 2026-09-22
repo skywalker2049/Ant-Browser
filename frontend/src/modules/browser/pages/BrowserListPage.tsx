@@ -209,10 +209,10 @@ export function BrowserListPage() {
         if (!startedProfile?.running) {
           failed++
           failureMessages.push(`${profile.profileName}：实例未进入运行状态。`)
-        } else if (!startedProfile.debugReady) {
+        } else if (startedProfile.remoteDebugEnabled && !startedProfile.debugReady) {
           pending++
           pendingMessages.push(`${profile.profileName}：${startedProfile.runtimeWarning || '浏览器已打开，正在后台接管。'}`)
-        } else if (startedProfile.debugPort <= 0) {
+        } else if (startedProfile.remoteDebugEnabled && startedProfile.debugPort <= 0) {
           failed++
           failureMessages.push(`${profile.profileName}：调试端口无效，实例不可操作。`)
         } else {

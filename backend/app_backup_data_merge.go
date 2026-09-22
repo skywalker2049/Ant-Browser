@@ -239,8 +239,8 @@ WHERE NOT EXISTS (
 				return nil, err
 			}
 			if hasRestoreLastSession {
-				sqlText = `INSERT INTO browser_profiles (profile_id, profile_name, user_data_dir, core_id, fingerprint_args, proxy_id, proxy_config, launch_args, tags, keywords, group_id, created_at, updated_at, restore_last_session)
-SELECT s.profile_id, s.profile_name, s.user_data_dir, s.core_id, s.fingerprint_args, s.proxy_id, s.proxy_config, s.launch_args, s.tags, s.keywords, COALESCE(s.group_id,''), s.created_at, s.updated_at, COALESCE(s.restore_last_session,'')
+				sqlText = `INSERT INTO browser_profiles (profile_id, profile_name, user_data_dir, core_id, fingerprint_args, proxy_id, proxy_config, launch_args, tags, keywords, group_id, remote_debug_enabled, created_at, updated_at, restore_last_session)
+SELECT s.profile_id, s.profile_name, s.user_data_dir, s.core_id, s.fingerprint_args, s.proxy_id, s.proxy_config, s.launch_args, s.tags, s.keywords, COALESCE(s.group_id,''), COALESCE(s.remote_debug_enabled,0), s.created_at, s.updated_at, COALESCE(s.restore_last_session,'')
 FROM src.browser_profiles s
 WHERE NOT EXISTS (
   SELECT 1 FROM browser_profiles t

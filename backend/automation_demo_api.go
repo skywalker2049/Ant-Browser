@@ -318,11 +318,12 @@ func buildAutomationDemoCreateRequest(options automationDemoCreateOptions) (stri
 	launchArgs := normalizeAutomationDemoLaunchArgs(options.LaunchArgs)
 	requestBody := map[string]interface{}{
 		"profile": map[string]interface{}{
-			"profileName": profileName,
-			"userDataDir": fmt.Sprintf("automation-demo-%s", strings.ToLower(strings.ReplaceAll(requestedCode, "_", "-"))),
-			"launchArgs":  launchArgs,
-			"tags":        []string{"自动化", "Demo"},
-			"keywords":    []string{"automation-demo", "launch-api-demo"},
+			"profileName":        profileName,
+			"userDataDir":        fmt.Sprintf("automation-demo-%s", strings.ToLower(strings.ReplaceAll(requestedCode, "_", "-"))),
+			"remoteDebugEnabled": true,
+			"launchArgs":         launchArgs,
+			"tags":               []string{"自动化", "Demo"},
+			"keywords":           []string{"automation-demo", "launch-api-demo"},
 		},
 		"launchCode": requestedCode,
 		"autoLaunch": options.AutoLaunch,

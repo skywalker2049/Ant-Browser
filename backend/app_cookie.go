@@ -190,6 +190,9 @@ func (a *App) getDebugPort(profileId string) (int, error) {
 	if !profile.Running {
 		return 0, fmt.Errorf("实例未运行")
 	}
+	if !profile.RemoteDebugEnabled {
+		return 0, fmt.Errorf("实例未开启远程调试，无法使用 CDP 功能")
+	}
 	if profile.DebugPort == 0 || !profile.DebugReady {
 		return 0, fmt.Errorf("实例调试接口尚未就绪，请稍后重试")
 	}

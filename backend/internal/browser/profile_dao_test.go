@@ -19,15 +19,16 @@ func TestSQLiteProfileDAOPersistsMemoryLimitMB(t *testing.T) {
 
 	dao := NewSQLiteProfileDAO(db.GetConn())
 	profile := &Profile{
-		ProfileId:       "profile-memory-limit",
-		ProfileName:     "memory limit",
-		MemoryLimitMB:   768,
-		FingerprintArgs: []string{},
-		LaunchArgs:      []string{},
-		Tags:            []string{},
-		Keywords:        []string{},
-		CreatedAt:       "2026-07-26T00:00:00Z",
-		UpdatedAt:       "2026-07-26T00:00:00Z",
+		ProfileId:          "profile-memory-limit",
+		ProfileName:        "memory limit",
+		MemoryLimitMB:      768,
+		FingerprintArgs:    []string{},
+		LaunchArgs:         []string{},
+		Tags:               []string{},
+		Keywords:           []string{},
+		RemoteDebugEnabled: true,
+		CreatedAt:          "2026-07-26T00:00:00Z",
+		UpdatedAt:          "2026-07-26T00:00:00Z",
 	}
 
 	if err := dao.Upsert(profile); err != nil {
@@ -51,5 +52,8 @@ func TestSQLiteProfileDAOPersistsMemoryLimitMB(t *testing.T) {
 	}
 	if listed[0].MemoryLimitMB != profile.MemoryLimitMB {
 		t.Fatalf("listed MemoryLimitMB = %d, want %d", listed[0].MemoryLimitMB, profile.MemoryLimitMB)
+	}
+	if !listed[0].RemoteDebugEnabled {
+		t.Fatal("RemoteDebugEnabled = false, want true")
 	}
 }

@@ -29,6 +29,7 @@ type Profile struct {
 	Tags               []string `json:"tags"`
 	Keywords           []string `json:"keywords"`
 	GroupId            string   `json:"groupId"` // 所属分组ID
+	RemoteDebugEnabled bool     `json:"remoteDebugEnabled"`
 	LaunchCode         string   `json:"launchCode"`
 	WindowMarkerCode   string   `json:"windowMarkerCode,omitempty"`
 	Running            bool     `json:"running"`
@@ -58,6 +59,7 @@ type ProfileInput struct {
 	Tags               []string `json:"tags"`
 	Keywords           []string `json:"keywords"`
 	GroupId            string   `json:"groupId"` // 所属分组ID
+	RemoteDebugEnabled bool     `json:"remoteDebugEnabled"`
 }
 
 // ProfileCopyOptions 复制实例时的附加选项。

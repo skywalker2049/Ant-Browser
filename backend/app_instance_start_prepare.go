@@ -34,6 +34,7 @@ type browserStartPlan struct {
 	releaseProxyBridge   bool
 	extensionWarning     string
 	assignedDebugPort    int
+	remoteDebugEnabled   bool
 	startReadyTimeout    time.Duration
 	startStableWindow    time.Duration
 	maxStartAttempts     int
@@ -151,19 +152,28 @@ func (a *App) prepareBrowserStartPlan(input browserStartInput, profile *BrowserP
 		browserLightStartEnabled(a.config),
 	)
 
-	assignedDebugPort, err := nextAvailablePort()
-	if err != nil {
-		if releaseProxyBridge {
-			a.releaseProxyBridgeRef(acquiredProxyBridge)
+	assignedDebugPort := 0
+	if profile.RemoteDebugEnabled {
+		assignedDebugPort, err = nextAvailablePort()
+		if err != nil {
+			if releaseProxyBridge {
+				a.releaseProxyBridgeRef(acquiredProxyBridge)
+			}
+			startErr := fmt.Errorf("实例启动失败：本地调试端口分配失败。原因：%v。请关闭占用端口的程序后重试。", err)
+			logger.New("Browser").Error("调试端口分配失败",
+				logger.F("profile_id", input.ProfileID),
+				logger.F("error", err.Error()),
+				logger.F("reason", startErr.Error()),
+			)
+			profile.LastError = startErr.Error()
+			return nil, startErr
 		}
-		startErr := fmt.Errorf("实例启动失败：本地调试端口分配失败。原因：%v。请关闭占用端口的程序后重试。", err)
-		logger.New("Browser").Error("调试端口分配失败",
-			logger.F("profile_id", input.ProfileID),
-			logger.F("error", err.Error()),
-			logger.F("reason", startErr.Error()),
-		)
-		profile.LastError = startErr.Error()
-		return nil, startErr
+	} else {
+		// 未开启 CDP 时，启动页必须直接作为 Chrome 进程参数传入。
+		configuredTargets := resolveConfiguredStartTargets(startURLs, defaultStartURLs, input.SkipDefaultStartURLs)
+		launchTargets = configuredTargets
+		deferredStartTargets = nil
+		deferredStartNewTabs = false
 	}
 
 	instanceArgs := buildBrowserLaunchArgs(userDataDir, assignedDebugPort, effectiveProxy, fingerprintLaunchArgs, sanitizedProfileLaunchArgs, sanitizedExtraLaunchArgs, launchTargets, restoreLastSession)
@@ -186,6 +196,7 @@ func (a *App) prepareBrowserStartPlan(input browserStartInput, profile *BrowserP
 		releaseProxyBridge:   releaseProxyBridge,
 		extensionWarning:     extensionWarning,
 		assignedDebugPort:    assignedDebugPort,
+		remoteDebugEnabled:   profile.RemoteDebugEnabled,
 		startReadyTimeout:    startReadyTimeout,
 		startStableWindow:    startStableWindow,
 		maxStartAttempts:     maxStartAttempts,
@@ -272,26 +283,28 @@ func (a *App) prepareBrowserLaunchContext(input browserStartInput, profile *Brow
 		log.Error("浏览器语言偏好写入失败", logger.F("profile_id", input.ProfileID), logger.F("error", err.Error()))
 	}
 
-	if detection, ok := detectBrowserRuntimeByActivePort(userDataDir); ok && detection.DebugReady {
-		a.markProfileLastLaunchArgsLocked(profile, nil)
-		a.markProfileRunningLocked(input.ProfileID, profile, nil, detection.PID, detection.DebugPort, true, "")
-		log.Warn("检测到同一用户数据目录已有浏览器运行，已接管为当前实例状态",
-			logger.F("profile_id", input.ProfileID),
-			logger.F("user_data_dir", userDataDir),
-			logger.F("pid", detection.PID),
-			logger.F("debug_port", detection.DebugPort),
-		)
-		if len(normalizeNonEmptyStrings(input.StartURLs)) == 0 && len(normalizeNonEmptyStrings(input.ExtraLaunchArgs)) == 0 {
+	if profile.RemoteDebugEnabled {
+		if detection, ok := detectBrowserRuntimeByActivePort(userDataDir); ok && detection.DebugReady {
+			a.markProfileLastLaunchArgsLocked(profile, nil)
+			a.markProfileRunningLocked(input.ProfileID, profile, nil, detection.PID, detection.DebugPort, true, "")
+			log.Warn("检测到同一用户数据目录已有浏览器运行，已接管为当前实例状态",
+				logger.F("profile_id", input.ProfileID),
+				logger.F("user_data_dir", userDataDir),
+				logger.F("pid", detection.PID),
+				logger.F("debug_port", detection.DebugPort),
+			)
+			if len(normalizeNonEmptyStrings(input.StartURLs)) == 0 && len(normalizeNonEmptyStrings(input.ExtraLaunchArgs)) == 0 {
+				return nil, nil, nil, "", "", errBrowserStartHandledByRecoveredRuntime
+			}
+			fingerprintExpectedArgs := a.fingerprintCheckExpectedArgsForRunningProfile(profile, input.ExtraLaunchArgs)
+			resolvedStartURLs := a.resolveFingerprintCheckStartURLsForExpectedArgsAndProfile(profile.ProfileId, fingerprintExpectedArgs, profile, input.StartURLs)
+			if err := a.openBrowserTabForRunningProfile(profile, input.ExtraLaunchArgs, resolvedStartURLs); err != nil {
+				startErr := fmt.Errorf("实例已在运行，但新标签打开失败：%w", err)
+				profile.LastError = startErr.Error()
+				return nil, nil, nil, "", "", startErr
+			}
 			return nil, nil, nil, "", "", errBrowserStartHandledByRecoveredRuntime
 		}
-		fingerprintExpectedArgs := a.fingerprintCheckExpectedArgsForRunningProfile(profile, input.ExtraLaunchArgs)
-		resolvedStartURLs := a.resolveFingerprintCheckStartURLsForExpectedArgsAndProfile(profile.ProfileId, fingerprintExpectedArgs, profile, input.StartURLs)
-		if err := a.openBrowserTabForRunningProfile(profile, input.ExtraLaunchArgs, resolvedStartURLs); err != nil {
-			startErr := fmt.Errorf("实例已在运行，但新标签打开失败：%w", err)
-			profile.LastError = startErr.Error()
-			return nil, nil, nil, "", "", startErr
-		}
-		return nil, nil, nil, "", "", errBrowserStartHandledByRecoveredRuntime
 	}
 
 	// 同一用户数据目录存在无法通过调试端口接管的残留浏览器进程时
@@ -348,8 +361,10 @@ func (a *App) prepareBrowserLaunchContext(input browserStartInput, profile *Brow
 func buildBrowserLaunchArgs(userDataDir string, debugPort int, effectiveProxy string, fingerprintLaunchArgs []string, sanitizedProfileLaunchArgs []string, sanitizedExtraLaunchArgs []string, launchTargets []string, restoreLastSession bool) []string {
 	args := []string{
 		fmt.Sprintf("--user-data-dir=%s", userDataDir),
-		fmt.Sprintf("--remote-debugging-port=%d", debugPort),
 		"--disable-session-crashed-bubble",
+	}
+	if debugPort > 0 {
+		args = append(args, fmt.Sprintf("--remote-debugging-port=%d", debugPort))
 	}
 	if restoreLastSession {
 		args = append(args, "--restore-last-session")

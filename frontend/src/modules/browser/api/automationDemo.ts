@@ -166,6 +166,7 @@ export async function automationDemoCreateProfile(options: AutomationDemoCreateO
     tags: ['自动化', 'Demo'],
     keywords: ['automation-demo', 'launch-api-demo'],
     groupId: '',
+    remoteDebugEnabled: true,
   })
   if (!profile) {
     return normalizeAutomationDemoResult({

@@ -84,6 +84,7 @@ func (m *Manager) loadProfiles() {
 			LaunchArgs:         append([]string{}, item.LaunchArgs...),
 			Tags:               append([]string{}, item.Tags...),
 			Keywords:           append([]string{}, item.Keywords...),
+			RemoteDebugEnabled: item.RemoteDebugEnabled,
 			Running:            false,
 			DebugPort:          0,
 			Pid:                0,
@@ -129,6 +130,7 @@ func (m *Manager) SaveProfiles() error {
 			LaunchArgs:         append([]string{}, profile.LaunchArgs...),
 			Tags:               append([]string{}, profile.Tags...),
 			Keywords:           append([]string{}, profile.Keywords...),
+			RemoteDebugEnabled: profile.RemoteDebugEnabled,
 			CreatedAt:          profile.CreatedAt,
 			UpdatedAt:          profile.UpdatedAt,
 		})

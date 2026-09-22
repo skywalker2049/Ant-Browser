@@ -78,6 +78,9 @@ func (a *App) BrowserProfileFingerprintCheck(profileId string) (*BrowserFingerpr
 	if err != nil {
 		return nil, err
 	}
+	if !profile.RemoteDebugEnabled {
+		return nil, fmt.Errorf("实例未开启远程调试，无法进行实时指纹自测")
+	}
 	if !profile.Running || !profile.DebugReady || profile.DebugPort <= 0 {
 		return nil, fmt.Errorf("实例未处于可自测状态，请先启动实例并等待调试端口就绪")
 	}

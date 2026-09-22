@@ -100,6 +100,7 @@ func (m *Manager) copyProfile(profileId string, newName string, fingerprintResol
 		Tags:               append([]string{}, src.Tags...),
 		Keywords:           append([]string{}, src.Keywords...),
 		GroupId:            src.GroupId,
+		RemoteDebugEnabled: src.RemoteDebugEnabled,
 		Running:            false,
 		DebugPort:          0,
 		Pid:                0,

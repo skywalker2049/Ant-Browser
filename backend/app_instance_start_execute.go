@@ -61,6 +61,34 @@ func (a *App) startBrowserProfileWithPlan(input browserStartInput, plan *browser
 	}()
 	monitor.Start()
 
+	if !plan.remoteDebugEnabled {
+		a.markProfileRunningLocked(input.ProfileID, profile, cmd, cmd.Process.Pid, 0, false, plan.extensionWarning)
+		a.setBrowserProcessMonitorLocked(input.ProfileID, monitor)
+		if plan.acquiredProxyBridge.valid() {
+			a.bindProfileProxyBridge(input.ProfileID, plan.acquiredProxyBridge)
+			plan.releaseProxyBridge = false
+		}
+		log.Info("实例启动（未开启远程调试）",
+			logger.F("profile_id", input.ProfileID),
+			logger.F("pid", profile.Pid),
+			logger.F("proxy", plan.effectiveProxy),
+			logger.F("memory_limit_mb", profile.MemoryLimitMB),
+			logger.F("args", strings.Join(plan.args, " ")),
+		)
+		a.emitBrowserInstanceStarted(profile, false)
+		cleanup := memoryLimitCleanup
+		memoryLimitCleanup = nil
+		go func() {
+			defer func() {
+				if cleanup != nil {
+					cleanup()
+				}
+			}()
+			a.waitBrowserProcess(input.ProfileID, monitor)
+		}()
+		return profile, nil
+	}
+
 	var lastStartErr error
 	for attempt := 1; attempt <= plan.maxStartAttempts; attempt++ {
 		stableDebugPort, readyErr := waitBrowserDebugPortStable(plan.assignedDebugPort, plan.userDataDir, plan.startReadyTimeout, plan.startStableWindow, monitor)

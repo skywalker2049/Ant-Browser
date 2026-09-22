@@ -17,6 +17,7 @@
   tags: string[]
   keywords: string[]
   groupId?: string
+  remoteDebugEnabled: boolean
   running: boolean
   debugPort: number
   debugReady: boolean
@@ -45,6 +46,7 @@ export interface BrowserProfileInput {
   tags: string[]
   keywords: string[]
   groupId?: string
+  remoteDebugEnabled?: boolean
 }
 
 export interface BrowserFingerprintRuntimeInfo {

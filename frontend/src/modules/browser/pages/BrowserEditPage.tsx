@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { ChevronDown, ChevronUp, FolderOpen, HelpCircle, Layers, ShieldCheck } from 'lucide-react'
-import { Button, Card, ConfirmModal, FormItem, Input, Modal, Select, Textarea, toast } from '../../../shared/components'
+import { Button, Card, ConfirmModal, FormItem, Input, Modal, Select, Switch, Textarea, toast } from '../../../shared/components'
 import type { BrowserCore, BrowserFingerprintCapabilityReport, BrowserFingerprintCapabilityRow, BrowserFingerprintCheckResult, BrowserProfileInput, BrowserProxy, BrowserGroup, ProxyLocationResolveResult } from '../types'
 import { browserProxyResolveLocation, checkBrowserProfileFingerprint, createBrowserProfile, fetchAllTags, fetchBrowserCores, fetchBrowserProfileFingerprintMatrix, fetchBrowserProfiles, fetchBrowserProxies, fetchBrowserSettings, fetchGroups, openBrowserFingerprintCheck, openUserDataDir, updateBrowserProfile, validateProxyConfig } from '../api'
 import { FingerprintPanel } from '../components/FingerprintPanel'
@@ -252,6 +252,7 @@ export function BrowserEditPage() {
     tags: [],
     keywords: [],
     groupId: '',
+    remoteDebugEnabled: false,
   })
   const [cores, setCores] = useState<BrowserCore[]>([])
   const [proxies, setProxies] = useState<BrowserProxy[]>([])
@@ -326,6 +327,7 @@ export function BrowserEditPage() {
         tags: current.tags,
         keywords: current.keywords || [],
         groupId: current.groupId || '',
+        remoteDebugEnabled: current.remoteDebugEnabled === true,
       })
       setLaunchArgsText(currentLaunchArgs.join('\n'))
     }
@@ -348,7 +350,7 @@ export function BrowserEditPage() {
     return () => { cancelled = true }
   }, [id, isCreate, formData.coreId, fingerprintArgsKey])
 
-  const handleChange = (field: keyof BrowserProfileInput, value: string | string[] | number) => {
+  const handleChange = (field: keyof BrowserProfileInput, value: string | string[] | number | boolean) => {
     setIsDirty(true)
     setFormData(prev => {
       if (field === 'proxyId') {
@@ -396,6 +398,7 @@ export function BrowserEditPage() {
       proxyConfig: resolvedProxyConfig,
       memoryLimitMb: Math.max(0, Math.floor(Number(formData.memoryLimitMb) || 0)),
       launchArgs: normalizeLaunchArgs(launchArgsText.split('\n')),
+      remoteDebugEnabled: formData.remoteDebugEnabled === true,
     }
     const fingerprintValidation = validateFingerprintArgs(payload.fingerprintArgs)
     if (!fingerprintValidation.valid) {
@@ -596,6 +599,18 @@ export function BrowserEditPage() {
               onChange={e => handleChange('memoryLimitMb', Math.max(0, Math.floor(Number(e.target.value) || 0)))}
               placeholder="0 表示不限制"
             />
+          </FormItem>
+          <FormItem label="远程调试">
+            <div className="flex items-center gap-3 min-h-9">
+              <Switch
+                checked={formData.remoteDebugEnabled === true}
+                onChange={checked => handleChange('remoteDebugEnabled', checked)}
+                aria-label="远程调试"
+              />
+              <span className="text-xs text-[var(--color-text-muted)]">
+                开启后可使用 Cookie、标签页控制、自动化和实时指纹自测；默认关闭。
+              </span>
+            </div>
           </FormItem>
           <FormItem label="标签">
             <TagInput

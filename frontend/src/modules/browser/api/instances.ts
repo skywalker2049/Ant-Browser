@@ -13,8 +13,8 @@ export async function startBrowserInstance(profileId: string): Promise<BrowserPr
       ? {
           ...item,
           running: true,
-          debugPort: 9222,
-          debugReady: true,
+          debugPort: item.remoteDebugEnabled === true ? 9222 : 0,
+          debugReady: item.remoteDebugEnabled === true,
           pid: Math.floor(Math.random() * 100000),
           runtimeWarning: '',
           lastStartAt: nowISOString(),

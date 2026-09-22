@@ -58,6 +58,7 @@ let mockProfiles: BrowserProfile[] = [
     launchArgs: ['--disable-features=Translate'],
     tags: ['默认'],
     keywords: [],
+    remoteDebugEnabled: false,
     running: false,
     debugPort: 0,
     debugReady: false,
