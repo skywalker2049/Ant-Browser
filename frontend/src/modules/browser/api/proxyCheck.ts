@@ -1,5 +1,5 @@
 ﻿import type { ProxyCheckSettings } from '../types'
-import { getBindings } from './runtime'
+import { ensureMockFallbackAllowed, getBindings } from './runtime'
 
 export function createDefaultProxyCheckSettings(): ProxyCheckSettings {
   return {
@@ -15,6 +15,7 @@ export async function fetchProxyCheckSettings(): Promise<ProxyCheckSettings> {
   if (bindings?.GetProxyCheckSettings) {
     return (await bindings.GetProxyCheckSettings()) || createDefaultProxyCheckSettings()
   }
+  ensureMockFallbackAllowed()
   return createDefaultProxyCheckSettings()
 }
 
@@ -24,5 +25,6 @@ export async function saveProxyCheckSettings(settings: ProxyCheckSettings): Prom
     await bindings.SaveProxyCheckSettings(settings)
     return true
   }
+  ensureMockFallbackAllowed()
   return true
 }

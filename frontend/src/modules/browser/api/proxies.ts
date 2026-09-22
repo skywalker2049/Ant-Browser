@@ -1,5 +1,5 @@
 ﻿import type { BrowserProxy, ProxyBridgeWarmupResult, ProxyCoreDownloadInfoResult, ProxyCoreStatusResult, ProxyIPHealthResult, ProxyLocationResolveResult, ProxySpeedTestResult } from '../types'
-import { getBindings, getGoApp, getMockProxies, nowISOString, setMockProxies } from './runtime'
+import { ensureMockFallbackAllowed, getBindings, getGoApp, getMockProxies, nowISOString, setMockProxies } from './runtime'
 
 export interface ClashImportURLResult {
   url: string
@@ -18,6 +18,7 @@ export async function fetchBrowserProxies(): Promise<BrowserProxy[]> {
   if (bindings?.BrowserProxyList) {
     return (await bindings.BrowserProxyList()) || []
   }
+  ensureMockFallbackAllowed()
   return getMockProxies()
 }
 
@@ -26,6 +27,7 @@ export async function fetchBrowserProxyGroups(): Promise<string[]> {
   if (bindings?.BrowserProxyListGroups) {
     return (await bindings.BrowserProxyListGroups()) || []
   }
+  ensureMockFallbackAllowed()
   return []
 }
 
@@ -34,6 +36,7 @@ export async function fetchBrowserProxiesByGroup(groupName: string): Promise<Bro
   if (bindings?.BrowserProxyListByGroup) {
     return (await bindings.BrowserProxyListByGroup(groupName)) || []
   }
+  ensureMockFallbackAllowed()
   return getMockProxies().filter((proxy) => proxy.groupName === groupName)
 }
 
@@ -88,6 +91,7 @@ export async function saveBrowserProxies(proxies: BrowserProxy[]): Promise<boole
     await bindings.SaveBrowserProxies(proxies)
     return true
   }
+  ensureMockFallbackAllowed()
   setMockProxies(proxies)
   return true
 }
@@ -97,6 +101,7 @@ export async function validateProxyConfig(proxyConfig: string, proxyId: string):
   if (bindings?.ValidateProxyConfig) {
     return (await bindings.ValidateProxyConfig(proxyConfig, proxyId)) || { supported: true, errorMsg: '' }
   }
+  ensureMockFallbackAllowed()
   return { supported: true, errorMsg: '' }
 }
 
@@ -105,6 +110,7 @@ export async function testProxyConnectivity(proxyId: string, proxyConfig: string
   if (bindings?.TestProxyConnectivity) {
     return (await bindings.TestProxyConnectivity(proxyId, proxyConfig)) || { proxyId, ok: false, latencyMs: 0, engine: 'unknown', error: '调用失败' }
   }
+  ensureMockFallbackAllowed()
   await sleep(300 + Math.random() * 500)
   return { proxyId, ok: true, latencyMs: Math.floor(100 + Math.random() * 200), engine: 'mock', error: '' }
 }
@@ -114,6 +120,7 @@ export async function testProxyRealConnectivity(proxyId: string): Promise<ProxyS
   if (bindings?.TestProxyRealConnectivity) {
     return (await bindings.TestProxyRealConnectivity(proxyId)) || { proxyId, ok: false, latencyMs: 0, engine: 'unknown', error: '调用失败' }
   }
+  ensureMockFallbackAllowed()
   await sleep(300 + Math.random() * 500)
   return { proxyId, ok: true, latencyMs: Math.floor(100 + Math.random() * 400), engine: 'mock', error: '' }
 }
@@ -123,6 +130,7 @@ export async function browserProxyTestSpeed(proxyId: string): Promise<ProxySpeed
   if (bindings?.BrowserProxyTestSpeed) {
     return (await bindings.BrowserProxyTestSpeed(proxyId)) || { proxyId, ok: false, latencyMs: 0, engine: 'unknown', error: '调用失败' }
   }
+  ensureMockFallbackAllowed()
   await sleep(300 + Math.random() * 500)
   return { proxyId, ok: true, latencyMs: Math.floor(100 + Math.random() * 400), engine: 'mock', error: '' }
 }
@@ -132,6 +140,7 @@ export async function browserProxyBatchTestSpeed(proxyIds: string[], concurrency
   if (bindings?.BrowserProxyBatchTestSpeed) {
     return (await bindings.BrowserProxyBatchTestSpeed(proxyIds, concurrency)) || []
   }
+  ensureMockFallbackAllowed()
   await sleep(1000)
   return proxyIds.map((proxyId) => ({ proxyId, ok: true, latencyMs: Math.floor(100 + Math.random() * 400), engine: 'mock', error: '' }))
 }
@@ -148,6 +157,7 @@ export async function browserProxyWarmupBridge(proxyId: string): Promise<ProxyBr
       error: '调用失败',
     }
   }
+  ensureMockFallbackAllowed()
   await sleep(200)
   return { proxyId, ok: true, engine: 'mock', socksUrl: '', latencyMs: 0, error: '' }
 }
@@ -164,6 +174,7 @@ export async function browserProxyWarmupBridgeWithConfig(proxyId: string, proxyC
       error: '调用失败',
     }
   }
+  ensureMockFallbackAllowed()
   return browserProxyWarmupBridge(proxyId)
 }
 
@@ -172,6 +183,7 @@ export async function browserProxyBatchWarmupBridge(proxyIds: string[], concurre
   if (bindings?.BrowserProxyBatchWarmupBridge) {
     return (await bindings.BrowserProxyBatchWarmupBridge(proxyIds, concurrency)) || []
   }
+  ensureMockFallbackAllowed()
   await sleep(400)
   return proxyIds.map((proxyId) => ({ proxyId, ok: true, engine: 'mock', socksUrl: '', latencyMs: 0, error: '' }))
 }
@@ -199,6 +211,7 @@ export async function browserProxyCheckIPHealth(proxyId: string): Promise<ProxyI
     )
   }
 
+  ensureMockFallbackAllowed()
   await sleep(600)
   return {
     proxyId,
@@ -237,6 +250,7 @@ export async function browserProxyResolveLocation(proxyId: string): Promise<Prox
     }
   }
 
+  ensureMockFallbackAllowed()
   await sleep(400)
   return {
     proxyId,
@@ -260,6 +274,7 @@ export async function browserProxyBatchCheckIPHealth(proxyIds: string[], concurr
     return (await bindings.BrowserProxyBatchCheckIPHealth(proxyIds, concurrency)) || []
   }
 
+  ensureMockFallbackAllowed()
   await sleep(1200)
   return proxyIds.map((proxyId) => ({
     proxyId,

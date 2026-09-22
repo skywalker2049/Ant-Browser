@@ -343,6 +343,9 @@ func fingerprintCheckProxyDescriptor(raw string) (proxyType string, host string,
 }
 
 func fingerprintCheckPreferredUILanguage(expected BrowserFingerprintExpectedInfo) string {
+	if fingerprintCheckLanguageUsesEnglish(expected.Language) || fingerprintCheckLanguageUsesEnglish(expected.AcceptLanguage) {
+		return "en"
+	}
 	if fingerprintCheckPlatformUsesEnglish(expected.Platform) || fingerprintCheckPlatformUsesEnglish(expected.PlatformVersion) {
 		return "en"
 	}
@@ -350,6 +353,14 @@ func fingerprintCheckPreferredUILanguage(expected BrowserFingerprintExpectedInfo
 		return "en"
 	}
 	return "zh"
+}
+
+func fingerprintCheckLanguageUsesEnglish(value string) bool {
+	value = strings.ToLower(strings.TrimSpace(value))
+	if value == "" {
+		return false
+	}
+	return strings.HasPrefix(value, "en-") || value == "en" || strings.HasPrefix(value, "en,")
 }
 
 func fingerprintCheckPlatformUsesEnglish(value string) bool {

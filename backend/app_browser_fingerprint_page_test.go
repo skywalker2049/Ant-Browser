@@ -168,6 +168,20 @@ func TestFingerprintCheckPageUsesEnglishForLinuxAndMac(t *testing.T) {
 	}
 }
 
+func TestFingerprintCheckPageUsesConfiguredEnglishLanguage(t *testing.T) {
+	app := NewApp(t.TempDir())
+	context, err := app.buildFingerprintCheckPageContextForExpectedArgs("profile-en", []string{
+		"--fingerprint-platform=windows",
+		"--lang=en-US",
+	})
+	if err != nil {
+		t.Fatalf("build english context error = %v", err)
+	}
+	if !strings.Contains(string(context), "\"uiLanguage\": \"en\"") {
+		t.Fatalf("english fingerprint page context should use English UI: %s", context)
+	}
+}
+
 func TestFingerprintCheckPageContextUsesAdaptedArgs(t *testing.T) {
 	appRoot := t.TempDir()
 	app := NewApp(appRoot)

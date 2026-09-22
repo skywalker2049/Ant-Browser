@@ -19,38 +19,24 @@ type BookmarkSyncResult struct {
 }
 
 var defaultBookmarkList = []BrowserBookmark{
-	{Name: "指纹检测", URL: fingerprintCheckBookmarkURL},
 	{Name: "Google", URL: "https://www.google.com/"},
 	{Name: "Gmail", URL: "https://mail.google.com/"},
 	{Name: "Claude", URL: "https://claude.ai/"},
 	{Name: "ChatGPT", URL: "https://chatgpt.com/"},
 	{Name: "YouTube", URL: "https://www.youtube.com/"},
-	{Name: "IPPure", URL: "https://ippure.com/"},
-	{Name: "IPLark", URL: "https://iplark.com/"},
-	{Name: "Ping0", URL: "https://ping0.cc/"},
-}
-
-var verificationBookmarkList = []BrowserBookmark{
-	{Name: "指纹检测", URL: fingerprintCheckBookmarkURL},
-	{Name: "IPPure", URL: "https://ippure.com/"},
-	{Name: "IPLark", URL: "https://iplark.com/"},
-	{Name: "Ping0", URL: "https://ping0.cc/"},
-}
-
-var protectedBookmarkList = []BrowserBookmark{
-	{Name: "指纹检测", URL: fingerprintCheckBookmarkURL},
 }
 
 // BookmarkList 获取默认书签列表（优先 SQLite，降级 config.yaml）
 func (a *App) BookmarkList() []BrowserBookmark {
-	if a.browserMgr.BookmarkDAO != nil {
-		list, err := a.browserMgr.BookmarkDAO.List()
-		if err == nil && len(list) > 0 {
-			return normalizeBookmarkList(list)
-		}
-	}
+	// 显式配置优先于数据库，避免用户修改 config.yaml 后仍被旧 SQLite 数据遮蔽。
 	if len(a.config.Browser.DefaultBookmarks) > 0 {
 		return normalizeBookmarkList(a.config.Browser.DefaultBookmarks)
+	}
+	if a.browserMgr.BookmarkDAO != nil {
+		list, err := a.browserMgr.BookmarkDAO.List()
+		if err == nil {
+			return normalizeBookmarkList(list)
+		}
 	}
 	return normalizeBookmarkList(defaultBookmarkList)
 }
@@ -71,6 +57,12 @@ func (a *App) BookmarkSave(items []BrowserBookmark) error {
 	if a.browserMgr.BookmarkDAO != nil {
 		if err := a.browserMgr.BookmarkDAO.ReplaceAll(valid); err != nil {
 			log.Error("书签保存到数据库失败", logger.F("error", err.Error()))
+			return err
+		}
+		// 同步写入配置文件，使 SQLite 与显式配置保持一致；后续启动不会恢复旧列表。
+		a.config.Browser.DefaultBookmarks = append([]BrowserBookmark{}, valid...)
+		if err := a.config.Save(a.resolveAppPath("config.yaml")); err != nil {
+			log.Error("书签配置同步失败", logger.F("error", err.Error()))
 			return err
 		}
 		log.Info("书签已保存到数据库", logger.F("count", len(valid)))
@@ -118,38 +110,8 @@ func mergeBookmarksByURL(items []BrowserBookmark, required []BrowserBookmark) []
 }
 
 func normalizeBookmarkList(items []BrowserBookmark) []BrowserBookmark {
-	protectedOpenOnStart := map[string]bool{}
-	for _, item := range items {
-		if strings.EqualFold(strings.TrimSpace(item.URL), fingerprintCheckBookmarkURL) {
-			protectedOpenOnStart[fingerprintCheckBookmarkURL] = item.OpenOnStart
-		}
-	}
-	protected := make([]BrowserBookmark, 0, len(protectedBookmarkList))
-	for _, item := range protectedBookmarkList {
-		item.OpenOnStart = protectedOpenOnStart[item.URL]
-		protected = append(protected, item)
-	}
-	regular := make([]BrowserBookmark, 0, len(items)+len(verificationBookmarkList))
-	regular = append(regular, items...)
-	regular = append(regular, verificationBookmarkList...)
-	mergedRegular := mergeBookmarksByURL(regular, nil)
-	out := append([]BrowserBookmark{}, protected...)
-	seen := map[string]struct{}{}
-	for _, item := range out {
-		seen[strings.ToLower(strings.TrimSpace(item.URL))] = struct{}{}
-	}
-	for _, item := range mergedRegular {
-		key := strings.ToLower(strings.TrimSpace(item.URL))
-		if key == "" || key == strings.ToLower(fingerprintCheckBookmarkURL) {
-			continue
-		}
-		if _, ok := seen[key]; ok {
-			continue
-		}
-		seen[key] = struct{}{}
-		out = append(out, item)
-	}
-	return out
+	// 默认列表不再包含指纹检测入口，但允许用户显式保存该入口。
+	return mergeBookmarksByURL(items, nil)
 }
 
 // BookmarkSyncToProfiles 将当前默认书签增量同步到已有未运行实例。

@@ -16,6 +16,21 @@ export function nowISOString(): string {
   return new Date().toISOString()
 }
 
+export function allowMockFallback(): boolean {
+  const viteImportMeta = import.meta as ImportMeta & { env?: { DEV?: boolean } }
+  return viteImportMeta.env?.DEV === true
+}
+
+export function backendUnavailableError(): Error {
+  return new Error('当前环境未连接浏览器后端')
+}
+
+export function ensureMockFallbackAllowed(): void {
+  if (!allowMockFallback()) {
+    throw backendUnavailableError()
+  }
+}
+
 export function createDefaultBrowserSettings(): BrowserSettings {
   return {
     userDataRoot: 'data',

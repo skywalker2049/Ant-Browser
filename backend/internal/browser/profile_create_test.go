@@ -54,6 +54,18 @@ func TestCreateNormalizesRestoreLastSessionMode(t *testing.T) {
 	}
 }
 
+func TestUpdateRejectsRunningProfile(t *testing.T) {
+	manager := NewManager(&config.Config{}, t.TempDir())
+	profile, err := manager.Create(ProfileInput{ProfileName: "running"})
+	if err != nil {
+		t.Fatalf("Create returned error: %v", err)
+	}
+	manager.Profiles[profile.ProfileId].Running = true
+	if _, err := manager.Update(profile.ProfileId, ProfileInput{ProfileName: "changed"}); err == nil {
+		t.Fatal("Update should reject a running profile")
+	}
+}
+
 func assertStringSliceContains(t *testing.T, values []string, expected string) {
 	t.Helper()
 	for _, value := range values {

@@ -1,6 +1,7 @@
 package backend
 
 import (
+	"ant-chrome/backend/internal/browser"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -47,7 +48,10 @@ func writeBrowserLanguagePreferences(userDataDir string, args []string) error {
 		return nil
 	}
 
-	profileDir := filepath.Join(userDataDir, "Default")
+	profileDir, err := browser.ResolveChromeProfileDir(userDataDir)
+	if err != nil {
+		return err
+	}
 	if err := os.MkdirAll(profileDir, 0o755); err != nil {
 		return err
 	}

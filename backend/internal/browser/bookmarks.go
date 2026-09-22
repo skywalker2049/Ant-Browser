@@ -17,13 +17,51 @@ func toChromiumTime(t time.Time) string {
 	return fmt.Sprintf("%d", t.Sub(chromiumEpoch).Microseconds())
 }
 
+// ResolveChromeProfileDir returns the profile directory managed by this app.
+// Existing non-Default profiles are rejected to avoid silent no-op writes.
+func ResolveChromeProfileDir(userDataDir string) (string, error) {
+	userDataDir = strings.TrimSpace(userDataDir)
+	if userDataDir == "" {
+		return "", fmt.Errorf("浏览器用户数据目录为空")
+	}
+	defaultDir := filepath.Join(userDataDir, "Default")
+	if info, err := os.Stat(defaultDir); err == nil {
+		if !info.IsDir() {
+			return "", fmt.Errorf("浏览器 Default profile 路径不是目录：%s", defaultDir)
+		}
+		return defaultDir, nil
+	} else if !os.IsNotExist(err) {
+		return "", err
+	}
+	entries, err := os.ReadDir(userDataDir)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return defaultDir, nil
+		}
+		return "", err
+	}
+	for _, entry := range entries {
+		if !entry.IsDir() {
+			continue
+		}
+		name := strings.ToLower(strings.TrimSpace(entry.Name()))
+		if name == "guest profile" || strings.HasPrefix(name, "profile ") {
+			return "", fmt.Errorf("检测到 Chrome 用户目录 %q；当前实例仅支持 Default profile，请先迁移或清理该用户数据目录", entry.Name())
+		}
+	}
+	return defaultDir, nil
+}
+
 // EnsureDefaultBookmarks 将默认书签合并到书签栏（已存在的 URL 不重复添加）
 func EnsureDefaultBookmarks(userDataDir string, bookmarks []config.BrowserBookmark) error {
 	if len(bookmarks) == 0 {
 		return nil
 	}
 
-	profileDir := filepath.Join(userDataDir, "Default")
+	profileDir, err := ResolveChromeProfileDir(userDataDir)
+	if err != nil {
+		return err
+	}
 	if err := os.MkdirAll(profileDir, 0755); err != nil {
 		return fmt.Errorf("创建 profile 目录失败: %w", err)
 	}
@@ -107,7 +145,11 @@ func ReplaceBookmarkURL(userDataDir string, oldURL string, newURL string) (bool,
 }
 
 func replaceBookmarkURL(userDataDir string, newURL string, match func(map[string]interface{}) bool) (bool, error) {
-	bookmarksPath := filepath.Join(userDataDir, "Default", "Bookmarks")
+	profileDir, err := ResolveChromeProfileDir(userDataDir)
+	if err != nil {
+		return false, err
+	}
+	bookmarksPath := filepath.Join(profileDir, "Bookmarks")
 	data, err := os.ReadFile(bookmarksPath)
 	if err != nil {
 		if os.IsNotExist(err) {

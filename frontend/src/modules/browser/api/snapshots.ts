@@ -1,11 +1,12 @@
 import type { SnapshotInfo } from '../types'
-import { getBindings, nowISOString } from './runtime'
+import { ensureMockFallbackAllowed, getBindings, nowISOString } from './runtime'
 
 export async function listSnapshots(profileId: string): Promise<SnapshotInfo[]> {
   const bindings: any = await getBindings()
   if (bindings?.BrowserSnapshotList) {
     return (await bindings.BrowserSnapshotList(profileId)) || []
   }
+  ensureMockFallbackAllowed()
   return []
 }
 
@@ -14,6 +15,7 @@ export async function createSnapshot(profileId: string, name: string): Promise<S
   if (bindings?.BrowserSnapshotCreate) {
     return (await bindings.BrowserSnapshotCreate(profileId, name)) || null
   }
+  ensureMockFallbackAllowed()
   return {
     snapshotId: `snap-${Date.now()}`,
     profileId,
@@ -29,6 +31,7 @@ export async function restoreSnapshot(profileId: string, snapshotId: string): Pr
     await bindings.BrowserSnapshotRestore(profileId, snapshotId)
     return true
   }
+  ensureMockFallbackAllowed()
   return true
 }
 
@@ -38,5 +41,6 @@ export async function deleteSnapshot(profileId: string, snapshotId: string): Pro
     await bindings.BrowserSnapshotDelete(profileId, snapshotId)
     return true
   }
+  ensureMockFallbackAllowed()
   return true
 }

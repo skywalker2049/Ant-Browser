@@ -29,6 +29,10 @@ func (a *App) GetBrowserSettings() BrowserSettings {
 
 func (a *App) SaveBrowserSettings(settings BrowserSettings) error {
 	log := logger.New("Browser")
+	if err := a.migrateBrowserUserDataRoot(settings.UserDataRoot); err != nil {
+		log.Error("用户数据根目录迁移失败", logger.F("error", err.Error()))
+		return err
+	}
 	a.config.Browser.UserDataRoot = strings.TrimSpace(settings.UserDataRoot)
 	a.config.Browser.DefaultFingerprintArgs = append([]string{}, settings.DefaultFingerprintArgs...)
 	a.config.Browser.DefaultLaunchArgs = append([]string{}, settings.DefaultLaunchArgs...)
@@ -54,6 +58,88 @@ func (a *App) SaveBrowserSettings(settings BrowserSettings) error {
 	if err := a.config.Save(a.resolveAppPath("config.yaml")); err != nil {
 		log.Error("浏览器配置保存失败", logger.F("error", err))
 		return err
+	}
+	return nil
+}
+
+type browserUserDataMove struct {
+	from string
+	to   string
+}
+
+// migrateBrowserUserDataRoot prevents a root-directory setting change from silently
+// rebinding every relative profile to an unrelated empty directory.
+func (a *App) migrateBrowserUserDataRoot(nextRoot string) error {
+	if a == nil || a.config == nil || a.browserMgr == nil {
+		return nil
+	}
+	oldRoot := strings.TrimSpace(a.config.Browser.UserDataRoot)
+	newRoot := strings.TrimSpace(nextRoot)
+	if oldRoot == "" {
+		oldRoot = "data"
+	}
+	if newRoot == "" {
+		newRoot = "data"
+	}
+	oldAbs := a.resolveAppPath(oldRoot)
+	newAbs := a.resolveAppPath(newRoot)
+	oldAbs, _ = filepath.Abs(oldAbs)
+	newAbs, _ = filepath.Abs(newAbs)
+	if strings.EqualFold(filepath.Clean(oldAbs), filepath.Clean(newAbs)) {
+		return nil
+	}
+
+	profiles := a.browserMgr.List()
+	for _, profile := range profiles {
+		if profile.Running {
+			return fmt.Errorf("实例 %q 正在运行，请先停止所有实例后再修改用户数据根目录", profile.ProfileName)
+		}
+	}
+
+	moves := make([]browserUserDataMove, 0, len(profiles))
+	for _, profile := range profiles {
+		relative := strings.TrimSpace(profile.UserDataDir)
+		if relative == "" {
+			relative = strings.TrimSpace(profile.ProfileId)
+		}
+		if relative == "" || filepath.IsAbs(relative) {
+			continue
+		}
+		from := filepath.Clean(filepath.Join(oldAbs, relative))
+		to := filepath.Clean(filepath.Join(newAbs, relative))
+		if strings.EqualFold(from, to) {
+			continue
+		}
+		fromInfo, fromErr := os.Stat(from)
+		if fromErr != nil {
+			if os.IsNotExist(fromErr) {
+				continue
+			}
+			return fmt.Errorf("检查旧实例目录 %s 失败：%w", from, fromErr)
+		}
+		if !fromInfo.IsDir() {
+			return fmt.Errorf("旧实例路径不是目录：%s", from)
+		}
+		if _, toErr := os.Stat(to); toErr == nil {
+			return fmt.Errorf("新实例目录已存在，拒绝覆盖：%s", to)
+		} else if !os.IsNotExist(toErr) {
+			return fmt.Errorf("检查新实例目录 %s 失败：%w", to, toErr)
+		}
+		moves = append(moves, browserUserDataMove{from: from, to: to})
+	}
+
+	moved := make([]browserUserDataMove, 0, len(moves))
+	for _, move := range moves {
+		if err := os.MkdirAll(filepath.Dir(move.to), 0o755); err != nil {
+			return fmt.Errorf("创建新实例目录父目录失败：%w", err)
+		}
+		if err := os.Rename(move.from, move.to); err != nil {
+			for index := len(moved) - 1; index >= 0; index-- {
+				_ = os.Rename(moved[index].to, moved[index].from)
+			}
+			return fmt.Errorf("迁移实例目录 %s 到 %s 失败：%w", move.from, move.to, err)
+		}
+		moved = append(moved, move)
 	}
 	return nil
 }

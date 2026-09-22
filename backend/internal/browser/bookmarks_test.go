@@ -36,3 +36,24 @@ func TestReplaceBookmarkURLUpdatesExistingBookmark(t *testing.T) {
 		t.Fatalf("bookmarks missing new URL: %s", content)
 	}
 }
+
+func TestResolveChromeProfileDirRejectsExistingNonDefaultProfile(t *testing.T) {
+	userDataDir := t.TempDir()
+	if err := os.Mkdir(filepath.Join(userDataDir, "Profile 1"), 0755); err != nil {
+		t.Fatalf("create profile directory: %v", err)
+	}
+	if _, err := ResolveChromeProfileDir(userDataDir); err == nil {
+		t.Fatalf("ResolveChromeProfileDir() accepted an existing Profile 1 directory")
+	}
+}
+
+func TestResolveChromeProfileDirUsesDefaultForNewDataRoot(t *testing.T) {
+	userDataDir := filepath.Join(t.TempDir(), "new-profile")
+	profileDir, err := ResolveChromeProfileDir(userDataDir)
+	if err != nil {
+		t.Fatalf("ResolveChromeProfileDir() error = %v", err)
+	}
+	if profileDir != filepath.Join(userDataDir, "Default") {
+		t.Fatalf("profile dir = %q, want Default directory", profileDir)
+	}
+}

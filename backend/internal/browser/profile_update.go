@@ -19,6 +19,9 @@ func (m *Manager) Update(profileId string, input ProfileInput) (*Profile, error)
 		log.Error("浏览器配置不存在", logger.F("profile_id", profileId))
 		return nil, fmt.Errorf("profile not found")
 	}
+	if profile.Running {
+		return nil, fmt.Errorf("实例正在运行，请先停止后再修改配置")
+	}
 	resolvedProxy, err := m.resolveProfileProxyInput(input.ProxyId, input.ProxyConfig)
 	if err != nil {
 		log.Error("代理绑定失败", logger.F("profile_id", profileId), logger.F("proxy_id", strings.TrimSpace(input.ProxyId)), logger.F("error", err.Error()))

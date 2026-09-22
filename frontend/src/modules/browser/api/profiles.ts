@@ -11,13 +11,14 @@ import type {
   BrowserProfilePackageImportAction,
   BrowserProfilePackageImportResult,
 } from '../types'
-import { getBindings, getMockProfiles, nowISOString, setMockProfiles } from './runtime'
+import { ensureMockFallbackAllowed, getBindings, getMockProfiles, nowISOString, setMockProfiles } from './runtime'
 
 export async function fetchBrowserProfiles(): Promise<BrowserProfile[]> {
   const bindings: any = await getBindings()
   if (bindings?.BrowserProfileList) {
     return (await bindings.BrowserProfileList()) || []
   }
+  ensureMockFallbackAllowed()
   return getMockProfiles().filter((profile) => !profile.deletedAt)
 }
 
@@ -30,6 +31,7 @@ export async function fetchBrowserProfileFingerprintMatrix(
   if (bindings?.BrowserProfileFingerprintMatrix) {
     return await bindings.BrowserProfileFingerprintMatrix(profileId, coreId, fingerprintArgs || [])
   }
+  ensureMockFallbackAllowed()
   return {
     profileId,
     coreId,
@@ -56,6 +58,7 @@ export async function checkBrowserProfileFingerprint(profileId: string): Promise
   if (bindings?.BrowserProfileFingerprintCheck) {
     return await bindings.BrowserProfileFingerprintCheck(profileId)
   }
+  ensureMockFallbackAllowed()
   const profile = getMockProfiles().find(item => item.profileId === profileId)
   if (!profile?.running || !profile?.debugReady) {
     throw new Error('实例未处于可自测状态，请先启动实例并等待调试端口就绪')
@@ -123,6 +126,7 @@ export async function fetchBrowserProfileTrash(): Promise<BrowserProfile[]> {
   if (bindings?.BrowserProfileTrashList) {
     return (await bindings.BrowserProfileTrashList()) || []
   }
+  ensureMockFallbackAllowed()
   return getMockProfiles().filter((profile) => !!profile.deletedAt)
 }
 
@@ -131,6 +135,7 @@ export async function fetchBrowserProfilesByTag(tag: string): Promise<BrowserPro
   if (bindings?.BrowserProfileListByTag) {
     return (await bindings.BrowserProfileListByTag(tag)) || []
   }
+  ensureMockFallbackAllowed()
   return getMockProfiles().filter((profile) => profile.tags?.includes(tag))
 }
 
@@ -139,6 +144,7 @@ export async function fetchAllTags(): Promise<string[]> {
   if (bindings?.BrowserGetAllTags) {
     return (await bindings.BrowserGetAllTags()) || []
   }
+  ensureMockFallbackAllowed()
 
   const tags = new Set<string>()
   getMockProfiles().forEach((profile) => profile.tags?.forEach((tag) => tags.add(tag)))
@@ -212,6 +218,7 @@ export async function createBrowserProfile(input: BrowserProfileInput): Promise<
   if (bindings?.BrowserProfileCreate) {
     return (await bindings.BrowserProfileCreate(input)) || null
   }
+  ensureMockFallbackAllowed()
 
   const profile: BrowserProfile = {
     profileId: `mock-${Date.now()}`,
@@ -235,6 +242,7 @@ export async function updateBrowserProfile(profileId: string, input: BrowserProf
   if (bindings?.BrowserProfileUpdate) {
     return (await bindings.BrowserProfileUpdate(profileId, input)) || null
   }
+  ensureMockFallbackAllowed()
 
   const profiles = getMockProfiles()
   const index = profiles.findIndex((item) => item.profileId === profileId)
@@ -254,6 +262,7 @@ export async function deleteBrowserProfile(profileId: string): Promise<boolean> 
     await bindings.BrowserProfileDelete(profileId)
     return true
   }
+  ensureMockFallbackAllowed()
 
   const deletedAt = nowISOString()
   setMockProfiles(getMockProfiles().map((item) => (
@@ -267,6 +276,7 @@ export async function restoreBrowserProfile(profileId: string): Promise<BrowserP
   if (bindings?.BrowserProfileRestore) {
     return (await bindings.BrowserProfileRestore(profileId)) || null
   }
+  ensureMockFallbackAllowed()
 
   const updatedAt = nowISOString()
   let restored: BrowserProfile | null = null
@@ -285,6 +295,7 @@ export async function permanentlyDeleteBrowserProfile(profileId: string): Promis
     await bindings.BrowserProfilePermanentlyDelete(profileId)
     return true
   }
+  ensureMockFallbackAllowed()
 
   setMockProfiles(getMockProfiles().filter((item) => item.profileId !== profileId))
   return true
@@ -296,6 +307,7 @@ export async function cleanupBrowserProfileTrash(): Promise<boolean> {
     await bindings.BrowserProfileTrashCleanup()
     return true
   }
+  ensureMockFallbackAllowed()
 
   const expiredBefore = Date.now() - 3 * 24 * 60 * 60 * 1000
   setMockProfiles(getMockProfiles().filter((item) => {
@@ -321,6 +333,7 @@ export async function copyBrowserProfile(
   if (bindings?.BrowserProfileCopy) {
     return (await bindings.BrowserProfileCopy(profileId, newName)) || null
   }
+  ensureMockFallbackAllowed()
 
   const source = getMockProfiles().find((profile) => profile.profileId === profileId)
   if (!source) {
@@ -355,6 +368,7 @@ export async function setProfileKeywords(profileId: string, keywords: string[]):
   if (bindings?.BrowserProfileSetKeywords) {
     return (await bindings.BrowserProfileSetKeywords(profileId, keywords)) || null
   }
+  ensureMockFallbackAllowed()
 
   const nextProfiles = getMockProfiles().map((profile) =>
     profile.profileId === profileId ? { ...profile, keywords, updatedAt: nowISOString() } : profile,
@@ -368,6 +382,7 @@ export async function getBrowserProfileCode(profileId: string): Promise<string> 
   if (bindings?.BrowserProfileGetCode) {
     return (await bindings.BrowserProfileGetCode(profileId)) || ''
   }
+  ensureMockFallbackAllowed()
   return ''
 }
 
@@ -376,6 +391,7 @@ export async function regenerateBrowserProfileCode(profileId: string): Promise<s
   if (bindings?.BrowserProfileRegenerateCode) {
     return (await bindings.BrowserProfileRegenerateCode(profileId)) || ''
   }
+  ensureMockFallbackAllowed()
   return ''
 }
 
@@ -384,6 +400,7 @@ export async function setBrowserProfileCode(profileId: string, code: string): Pr
   if (bindings?.BrowserProfileSetCode) {
     return (await bindings.BrowserProfileSetCode(profileId, code)) || ''
   }
+  ensureMockFallbackAllowed()
   return code.trim().toUpperCase()
 }
 
@@ -393,6 +410,7 @@ export async function batchSetProfileTags(profileIds: string[], tags: string[], 
     await bindings.BrowserProfileBatchSetTags(profileIds, tags, replace)
     return true
   }
+  ensureMockFallbackAllowed()
   return true
 }
 
@@ -402,6 +420,7 @@ export async function batchRemoveProfileTags(profileIds: string[], tags: string[
     await bindings.BrowserProfileBatchRemoveTags(profileIds, tags)
     return true
   }
+  ensureMockFallbackAllowed()
   return true
 }
 
@@ -411,5 +430,6 @@ export async function renameBrowserTag(oldName: string, newName: string): Promis
     await bindings.BrowserRenameTag(oldName, newName)
     return true
   }
+  ensureMockFallbackAllowed()
   return true
 }

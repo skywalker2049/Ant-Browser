@@ -4,6 +4,7 @@ import (
 	"ant-chrome/backend/internal/browser"
 	"ant-chrome/backend/internal/config"
 	"ant-chrome/backend/internal/logger"
+	"fmt"
 	"strings"
 	"time"
 )
@@ -56,7 +57,21 @@ func (a *App) BrowserProfileUpdate(profileId string, input BrowserProfileInput) 
 	return a.browserMgr.Update(profileId, input)
 }
 
-func (a *App) BrowserProfileDelete(profileId string) error { return a.browserMgr.Delete(profileId) }
+func (a *App) BrowserProfileDelete(profileId string) error {
+	if a == nil || a.browserMgr == nil {
+		return fmt.Errorf("browser manager is nil")
+	}
+	for _, profile := range a.browserMgr.List() {
+		if profile.ProfileId != profileId || !profile.Running {
+			continue
+		}
+		if _, err := a.BrowserInstanceStop(profileId); err != nil {
+			return fmt.Errorf("删除实例前停止浏览器失败：%w", err)
+		}
+		break
+	}
+	return a.browserMgr.Delete(profileId)
+}
 
 // BrowserProfileTrashList 获取回收站实例列表
 func (a *App) BrowserProfileTrashList() []BrowserProfile { return a.browserMgr.ListDeleted() }
@@ -183,14 +198,9 @@ func (a *App) migrateToSQLite() {
 	if bookmarks, err := a.browserMgr.BookmarkDAO.List(); err == nil && len(bookmarks) == 0 {
 		src := a.config.Browser.DefaultBookmarks
 		if len(src) == 0 {
-			src = []config.BrowserBookmark{
-				{Name: "Google", URL: "https://www.google.com/"},
-				{Name: "Gmail", URL: "https://mail.google.com/"},
-				{Name: "Claude", URL: "https://claude.ai/"},
-				{Name: "ChatGPT", URL: "https://chatgpt.com/"},
-				{Name: "YouTube", URL: "https://www.youtube.com/"},
-			}
+			src = append([]config.BrowserBookmark{}, defaultBookmarkList...)
 		}
+		src = normalizeBookmarkList(src)
 		if err := a.browserMgr.BookmarkDAO.ReplaceAll(src); err != nil {
 			log.Error("书签迁移失败", logger.F("error", err))
 		} else {

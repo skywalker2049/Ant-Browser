@@ -1,11 +1,12 @@
 import type { BrowserGroup, BrowserGroupInput, BrowserGroupWithCount } from '../types'
-import { getBindings } from './runtime'
+import { ensureMockFallbackAllowed, getBindings } from './runtime'
 
 export async function fetchGroups(): Promise<BrowserGroupWithCount[]> {
   const bindings: any = await getBindings()
   if (bindings?.ListGroups) {
     return (await bindings.ListGroups()) || []
   }
+  ensureMockFallbackAllowed()
   return []
 }
 
@@ -14,6 +15,7 @@ export async function createGroup(input: BrowserGroupInput): Promise<BrowserGrou
   if (bindings?.CreateGroup) {
     return (await bindings.CreateGroup(input)) || null
   }
+  ensureMockFallbackAllowed()
   return null
 }
 
@@ -22,6 +24,7 @@ export async function updateGroup(groupId: string, input: BrowserGroupInput): Pr
   if (bindings?.UpdateGroup) {
     return (await bindings.UpdateGroup(groupId, input)) || null
   }
+  ensureMockFallbackAllowed()
   return null
 }
 
@@ -31,6 +34,7 @@ export async function deleteGroup(groupId: string): Promise<boolean> {
     await bindings.DeleteGroup(groupId)
     return true
   }
+  ensureMockFallbackAllowed()
   return false
 }
 
@@ -40,5 +44,6 @@ export async function moveInstancesToGroup(profileIds: string[], groupId: string
     await bindings.MoveInstancesToGroup(profileIds, groupId)
     return true
   }
+  ensureMockFallbackAllowed()
   return false
 }

@@ -10,17 +10,19 @@ import (
 	"time"
 )
 
-func TestBookmarkListIncludesFingerprintCheck(t *testing.T) {
+func TestBookmarkListDoesNotPersistFingerprintCheck(t *testing.T) {
 	app := NewApp(t.TempDir())
 	app.config = &config.Config{}
 	app.browserMgr = browser.NewManager(app.config, app.appRoot)
 	list := app.BookmarkList()
-	if len(list) == 0 || list[0].URL != fingerprintCheckBookmarkURL {
-		t.Fatalf("first bookmark = %#v, want fingerprint check", list)
+	for _, item := range list {
+		if item.URL == fingerprintCheckBookmarkURL {
+			t.Fatalf("bookmark list unexpectedly contains fingerprint check: %#v", list)
+		}
 	}
 }
 
-func TestBookmarkSavePreservesFingerprintCheck(t *testing.T) {
+func TestBookmarkSaveOmitsFingerprintCheck(t *testing.T) {
 	app := NewApp(t.TempDir())
 	app.config = &config.Config{}
 	app.browserMgr = browser.NewManager(app.config, app.appRoot)
@@ -29,12 +31,14 @@ func TestBookmarkSavePreservesFingerprintCheck(t *testing.T) {
 		t.Fatalf("BookmarkSave() error = %v", err)
 	}
 	list := app.BookmarkList()
-	if len(list) == 0 || list[0].URL != fingerprintCheckBookmarkURL {
-		t.Fatalf("first bookmark = %#v, want protected fingerprint check", list)
+	for _, item := range list {
+		if item.URL == fingerprintCheckBookmarkURL {
+			t.Fatalf("bookmark list unexpectedly contains fingerprint check: %#v", list)
+		}
 	}
 }
 
-func TestBookmarkSaveKeepsFingerprintCheckOpenOnStart(t *testing.T) {
+func TestBookmarkSavePreservesExplicitFingerprintCheck(t *testing.T) {
 	app := NewApp(t.TempDir())
 	app.config = &config.Config{}
 	app.browserMgr = browser.NewManager(app.config, app.appRoot)
@@ -43,10 +47,27 @@ func TestBookmarkSaveKeepsFingerprintCheckOpenOnStart(t *testing.T) {
 		t.Fatalf("BookmarkSave() error = %v", err)
 	}
 	list := app.BookmarkList()
-	if len(list) == 0 || list[0].URL != fingerprintCheckBookmarkURL || !list[0].OpenOnStart {
-		t.Fatalf("first bookmark = %#v, want protected fingerprint check with openOnStart", list)
+	if len(list) != 1 || list[0].URL != fingerprintCheckBookmarkURL {
+		t.Fatalf("bookmark list = %#v, want explicit fingerprint check bookmark", list)
 	}
 }
+
+func TestBookmarkListPreservesExplicitlyEmptySQLiteList(t *testing.T) {
+	app := NewApp(t.TempDir())
+	app.config = &config.Config{}
+	app.browserMgr = browser.NewManager(app.config, app.appRoot)
+	app.browserMgr.BookmarkDAO = emptyBookmarkDAO{}
+	if list := app.BookmarkList(); len(list) != 0 {
+		t.Fatalf("BookmarkList() = %#v, want explicit empty list", list)
+	}
+}
+
+type emptyBookmarkDAO struct{}
+
+func (emptyBookmarkDAO) List() ([]config.BrowserBookmark, error) {
+	return []config.BrowserBookmark{}, nil
+}
+func (emptyBookmarkDAO) ReplaceAll([]config.BrowserBookmark) error { return nil }
 
 func TestResolveFingerprintCheckStartURLs(t *testing.T) {
 	app := NewApp(t.TempDir())
@@ -95,14 +116,14 @@ func TestResolveFingerprintCheckStartURLsWithProfileDoesNotRelockManager(t *test
 	}
 }
 
-func TestRuntimeBookmarksForProfileUsesFileURL(t *testing.T) {
+func TestRuntimeBookmarksForProfileUsesFileURLWhenExplicitlyRequested(t *testing.T) {
 	app := NewApp(t.TempDir())
 	app.config = &config.Config{}
 	app.browserMgr = browser.NewManager(app.config, app.appRoot)
 	app.browserMgr.Profiles["profile-123"] = &browser.Profile{ProfileId: "profile-123"}
 
 	bookmarks, fingerprintURL, err := app.runtimeBookmarksForProfile("profile-123", []BrowserBookmark{
-		{Name: "指纹检测", URL: fingerprintCheckBookmarkURL},
+		{Name: "检测", URL: fingerprintCheckBookmarkURL},
 		{Name: "Ping0", URL: "https://ping0.cc/"},
 	})
 	if err != nil {
