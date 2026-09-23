@@ -384,6 +384,7 @@ export interface ProxyLocationResolveResult {
   region: string
   city: string
   timezone: string
+  timezoneSource?: 'ip' | 'city' | 'country' | string
   lang: string
   health?: ProxyIPHealthResult
   alternates?: ProxyLocationOption[]

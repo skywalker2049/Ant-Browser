@@ -54,9 +54,20 @@ export interface FingerprintConfig {
   unknownArgs?: string[]        // 无法识别的原始参数，原样保留
 }
 
-export const PRESET_RESOLUTIONS = ['1920,1080', '1440,900', '1366,768', '2560,1440', '1280,800', '1600,900']
+export const PRESET_RESOLUTIONS = [
+  '1920,1080',
+  '1920,1200',
+  '1440,900',
+  '1366,768',
+  '2560,1440',
+  '2560,1600',
+  '3440,1440',
+  '1280,800',
+  '1536,864',
+  '1600,900',
+]
 
-const DEFAULT_WINDOW_WIDTH_RATIO = 0.42
+const DEFAULT_WINDOW_WIDTH_RATIO = 0.68
 const DEFAULT_WINDOW_MAX_WIDTH = 1440
 const DEFAULT_WINDOW_MIN_WIDTH = 960
 const DEFAULT_WINDOW_MIN_HEIGHT = 540
@@ -343,7 +354,7 @@ export function validateFingerprintArgs(rawArgs: string[]): FingerprintValidatio
     issues.push({ level: 'error', message: '窗口大小必须是 宽,高，例如 1920,1080' })
   }
   if (config.hardwareConcurrency && !isPositiveIntInRange(config.hardwareConcurrency, 1, 128)) {
-    issues.push({ level: 'error', message: 'CPU 核心数必须是 1 到 128 的整数' })
+    issues.push({ level: 'error', message: '逻辑处理器数必须是 1 到 128 的整数' })
   }
   if (config.webrtcPolicy && !KERNEL_WEBRTC_POLICIES.has(config.webrtcPolicy)) {
     issues.push({ level: 'warning', message: 'WebRTC 策略不是面板内置值，请确认当前内核是否支持' })
@@ -453,13 +464,162 @@ export interface FingerprintPreset {
   name: string
   description: string
   config: Partial<FingerprintConfig>
+  variants?: {
+    resolution?: string[]
+    hardwareConcurrency?: string[]
+    platformVersion?: string[]
+  }
+}
+
+function selectPresetVariant(values: string[] | undefined, seed: string, salt = 0): string | undefined {
+  if (!values?.length) return undefined
+  const numericSeed = Number(seed)
+  if (!Number.isSafeInteger(numericSeed) || numericSeed < 1) return values[0]
+  return values[(numericSeed + salt) % values.length]
+}
+
+function filterWindowVariants(values: string[] | undefined): string[] | undefined {
+  if (!values?.length || typeof window === 'undefined') return values
+  const availableWidth = positiveNumber(window.screen?.availWidth) || positiveNumber(window.screen?.width)
+  const availableHeight = positiveNumber(window.screen?.availHeight) || positiveNumber(window.screen?.height)
+  if (!availableWidth || !availableHeight) return values
+  const fitting = values.filter(value => {
+    const match = value.match(/^(\d+),(\d+)$/)
+    if (!match) return false
+    return Number(match[1]) <= availableWidth && Number(match[2]) <= availableHeight
+  })
+  return fitting.length ? fitting : values
+}
+
+export function buildFingerprintConfigFromPreset(preset: FingerprintPreset, seed = randomFingerprintSeed()): FingerprintConfig {
+  const config: FingerprintConfig = {
+    ...preset.config,
+    seed,
+  }
+  const resolution = selectPresetVariant(filterWindowVariants(preset.variants?.resolution), seed)
+  const hardwareConcurrency = selectPresetVariant(preset.variants?.hardwareConcurrency, seed)
+  const platformVersion = selectPresetVariant(preset.variants?.platformVersion, seed, 1)
+  if (resolution) config.resolution = resolution
+  if (hardwareConcurrency) config.hardwareConcurrency = hardwareConcurrency
+  if (platformVersion) config.platformVersion = platformVersion
+  return config
+}
+
+interface RegionalPresetDefinition {
+  id: string
+  name: string
+  description: string
+  lang: string
+  timezone: string
+  resolutions: string[]
+  hardwareConcurrency: string[]
+}
+
+const WINDOWS_PLATFORM_VERSION_VARIANTS = ['10.0.0', '13.0.0']
+
+const REGIONAL_PRESET_DEFINITIONS: RegionalPresetDefinition[] = [
+  {
+    id: 'win-chrome-de',
+    name: 'Windows / Chrome / 德国用户',
+    description: '模拟德国 Windows 用户，德语环境，欧洲中部时区',
+    lang: 'de-DE',
+    timezone: 'Europe/Berlin',
+    resolutions: ['1920,1080', '1920,1200', '2560,1440'],
+    hardwareConcurrency: ['8', '12', '16', '24'],
+  },
+  {
+    id: 'win-chrome-kr',
+    name: 'Windows / Chrome / 韩国用户',
+    description: '模拟韩国 Windows 用户，韩语环境，首尔时区',
+    lang: 'ko-KR',
+    timezone: 'Asia/Seoul',
+    resolutions: ['1920,1080', '1600,900', '2560,1440'],
+    hardwareConcurrency: ['8', '12', '16'],
+  },
+  {
+    id: 'win-chrome-sg',
+    name: 'Windows / Chrome / 新加坡用户',
+    description: '模拟新加坡 Windows 用户，英语环境，新加坡时区',
+    lang: 'en-SG',
+    timezone: 'Asia/Singapore',
+    resolutions: ['1920,1080', '1920,1200', '2560,1440'],
+    hardwareConcurrency: ['8', '12', '16'],
+  },
+  {
+    id: 'win-chrome-hk',
+    name: 'Windows / Chrome / 香港用户',
+    description: '模拟香港 Windows 用户，繁体中文环境，香港时区',
+    lang: 'zh-HK',
+    timezone: 'Asia/Hong_Kong',
+    resolutions: ['1920,1080', '1920,1200', '2560,1440'],
+    hardwareConcurrency: ['8', '12', '16'],
+  },
+  {
+    id: 'win-chrome-tw',
+    name: 'Windows / Chrome / 台湾用户',
+    description: '模拟台湾 Windows 用户，繁体中文环境，台北时区',
+    lang: 'zh-TW',
+    timezone: 'Asia/Taipei',
+    resolutions: ['1920,1080', '1920,1200', '2560,1440'],
+    hardwareConcurrency: ['8', '12', '16'],
+  },
+  {
+    id: 'win-chrome-in',
+    name: 'Windows / Chrome / 印度用户',
+    description: '模拟印度 Windows 用户，英语环境，印度标准时间',
+    lang: 'en-IN',
+    timezone: 'Asia/Kolkata',
+    resolutions: ['1366,768', '1920,1080', '1920,1200'],
+    hardwareConcurrency: ['8', '12', '16'],
+  },
+  {
+    id: 'win-chrome-ca',
+    name: 'Windows / Chrome / 加拿大用户',
+    description: '模拟加拿大 Windows 用户，英语环境，多伦多时区',
+    lang: 'en-CA',
+    timezone: 'America/Toronto',
+    resolutions: ['1920,1080', '1920,1200', '2560,1440'],
+    hardwareConcurrency: ['8', '12', '16', '24'],
+  },
+  {
+    id: 'win-chrome-ru',
+    name: 'Windows / Chrome / 俄罗斯用户',
+    description: '模拟俄罗斯 Windows 用户，俄语环境，莫斯科时区',
+    lang: 'ru-RU',
+    timezone: 'Europe/Moscow',
+    resolutions: ['1920,1080', '1920,1200', '2560,1440'],
+    hardwareConcurrency: ['8', '12', '16'],
+  },
+]
+
+function buildRegionalPreset(definition: RegionalPresetDefinition): FingerprintPreset {
+  return {
+    id: definition.id,
+    name: definition.name,
+    description: definition.description,
+    config: {
+      brand: 'Chrome',
+      platform: 'windows',
+      lang: definition.lang,
+      timezone: definition.timezone,
+      resolution: definition.resolutions[0],
+      hardwareConcurrency: definition.hardwareConcurrency[0],
+      webrtcPolicy: 'disable_non_proxied_udp',
+      ...EFFECTIVE_RUNTIME_NOISE_CONFIG,
+    },
+    variants: {
+      resolution: definition.resolutions,
+      hardwareConcurrency: definition.hardwareConcurrency,
+      platformVersion: WINDOWS_PLATFORM_VERSION_VARIANTS,
+    },
+  }
 }
 
 export const FINGERPRINT_PRESETS: FingerprintPreset[] = [
   {
     id: 'win-chrome-office',
     name: 'Windows / Chrome / 办公',
-    description: '模拟国内办公室 Windows 用户，中文环境，1920x1080',
+    description: '模拟国内办公室 Windows 用户，中文环境，常见办公窗口尺寸',
     config: {
       brand: 'Chrome',
       platform: 'windows',
@@ -470,11 +630,16 @@ export const FINGERPRINT_PRESETS: FingerprintPreset[] = [
       webrtcPolicy: 'disable_non_proxied_udp',
       ...EFFECTIVE_RUNTIME_NOISE_CONFIG,
     },
+    variants: {
+      resolution: ['1920,1080', '1920,1200', '1600,900'],
+      hardwareConcurrency: ['8', '12', '16'],
+      platformVersion: ['10.0.0', '13.0.0'],
+    },
   },
   {
     id: 'win-chrome-gaming',
     name: 'Windows / Chrome / 游戏主机',
-    description: '模拟高配 Windows 用户，英文环境，2560x1440',
+    description: '模拟高配 Windows 用户，英文环境，高分辨率窗口尺寸',
     config: {
       brand: 'Chrome',
       platform: 'windows',
@@ -485,11 +650,16 @@ export const FINGERPRINT_PRESETS: FingerprintPreset[] = [
       webrtcPolicy: 'disable_non_proxied_udp',
       ...EFFECTIVE_RUNTIME_NOISE_CONFIG,
     },
+    variants: {
+      resolution: ['1920,1080', '2560,1440', '3440,1440'],
+      hardwareConcurrency: ['16', '24', '32'],
+      platformVersion: ['10.0.0', '13.0.0'],
+    },
   },
   {
     id: 'mac-chrome-designer',
     name: 'macOS / Chrome / 设计师',
-    description: '模拟 Mac 设计师用户，中文环境，Retina 分辨率',
+    description: '模拟 Mac 设计师用户，中文环境，Retina 常见窗口尺寸',
     config: {
       brand: 'Chrome',
       platform: 'macos',
@@ -499,6 +669,11 @@ export const FINGERPRINT_PRESETS: FingerprintPreset[] = [
       hardwareConcurrency: '10',
       webrtcPolicy: 'disable_non_proxied_udp',
       ...EFFECTIVE_RUNTIME_NOISE_CONFIG,
+    },
+    variants: {
+      resolution: ['1440,900', '2560,1440', '2560,1600'],
+      hardwareConcurrency: ['8', '12', '16', '24'],
+      platformVersion: ['14.0.0', '15.2.0', '15.6.0'],
     },
   },
   {
@@ -515,11 +690,16 @@ export const FINGERPRINT_PRESETS: FingerprintPreset[] = [
       webrtcPolicy: 'default_public_interface_only',
       ...EFFECTIVE_RUNTIME_NOISE_CONFIG,
     },
+    variants: {
+      resolution: ['1366,768', '1536,864', '1600,900', '1920,1080'],
+      hardwareConcurrency: ['8', '12', '16'],
+      platformVersion: ['10.0.0', '13.0.0'],
+    },
   },
   {
     id: 'win-chrome-us-user',
     name: 'Windows / Chrome / 美国用户',
-    description: '模拟美国普通用户，英文环境，1920x1080',
+    description: '模拟美国普通用户，英文环境，常见桌面窗口尺寸',
     config: {
       brand: 'Chrome',
       platform: 'windows',
@@ -529,6 +709,11 @@ export const FINGERPRINT_PRESETS: FingerprintPreset[] = [
       hardwareConcurrency: '8',
       webrtcPolicy: 'disable_non_proxied_udp',
       ...EFFECTIVE_RUNTIME_NOISE_CONFIG,
+    },
+    variants: {
+      resolution: ['1920,1080', '1920,1200', '2560,1440'],
+      hardwareConcurrency: ['8', '12', '16', '24'],
+      platformVersion: ['10.0.0', '13.0.0'],
     },
   },
   {
@@ -545,6 +730,11 @@ export const FINGERPRINT_PRESETS: FingerprintPreset[] = [
       webrtcPolicy: 'disable_non_proxied_udp',
       ...EFFECTIVE_RUNTIME_NOISE_CONFIG,
     },
+    variants: {
+      resolution: ['1440,900', '2560,1440', '2560,1600'],
+      hardwareConcurrency: ['8', '12', '16', '24'],
+      platformVersion: ['14.0.0', '15.2.0', '15.6.0'],
+    },
   },
   {
     id: 'win-chrome-uk-office',
@@ -559,6 +749,11 @@ export const FINGERPRINT_PRESETS: FingerprintPreset[] = [
       hardwareConcurrency: '8',
       webrtcPolicy: 'disable_non_proxied_udp',
       ...EFFECTIVE_RUNTIME_NOISE_CONFIG,
+    },
+    variants: {
+      resolution: ['1920,1080', '1920,1200', '2560,1440'],
+      hardwareConcurrency: ['8', '12', '16'],
+      platformVersion: ['10.0.0', '13.0.0'],
     },
   },
   {
@@ -575,7 +770,13 @@ export const FINGERPRINT_PRESETS: FingerprintPreset[] = [
       webrtcPolicy: 'disable_non_proxied_udp',
       ...EFFECTIVE_RUNTIME_NOISE_CONFIG,
     },
+    variants: {
+      resolution: ['1440,900', '1920,1080', '2560,1440'],
+      hardwareConcurrency: ['8', '12', '16', '24'],
+      platformVersion: ['14.0.0', '15.2.0', '15.6.0'],
+    },
   },
+  ...REGIONAL_PRESET_DEFINITIONS.map(buildRegionalPreset),
 ]
 
 export function applyLocaleToFingerprintArgs(args: string[], lang: string, timezone: string): string[] {

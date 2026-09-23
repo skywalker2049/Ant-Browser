@@ -7,6 +7,7 @@ import {
   PRESET_RESOLUTIONS,
   buildAcceptLanguage,
   buildFingerprintConfigFromPersona,
+  buildFingerprintConfigFromPreset,
   deserialize,
   getSystemTimezone,
   randomFingerprintSeed,
@@ -63,7 +64,10 @@ const BRAND_VERSION_OPTIONS = [
 
 const PLATFORM_VERSION_OPTIONS = [
   { value: '10.0.0', label: 'Windows 10 / 10.0.0' },
+  { value: '13.0.0', label: 'Windows 11 / 13.0.0' },
+  { value: '14.0.0', label: 'macOS 14 / 14.0.0' },
   { value: '15.2.0', label: 'macOS 15.2 / 15.2.0' },
+  { value: '15.6.0', label: 'macOS 15.6 / 15.6.0' },
 ]
 
 const ACCEPT_LANG_OPTIONS = LANG_OPTIONS
@@ -92,12 +96,42 @@ const TIMEZONE_OPTIONS = [
   { value: 'Europe/London', label: 'Europe/London (UTC+0)' },
   { value: 'Europe/Paris', label: 'Europe/Paris (UTC+1)' },
   { value: 'Europe/Berlin', label: 'Europe/Berlin (UTC+1)' },
+  { value: 'Europe/Amsterdam', label: 'Europe/Amsterdam (UTC+1)' },
   { value: 'Europe/Moscow', label: 'Europe/Moscow (UTC+3)' },
   { value: 'Australia/Sydney', label: 'Australia/Sydney (UTC+10)' },
   { value: 'Australia/Melbourne', label: 'Australia/Melbourne (UTC+10)' },
   { value: 'Australia/Perth', label: 'Australia/Perth (UTC+8)' },
   { value: 'Pacific/Auckland', label: 'Pacific/Auckland (UTC+12)' },
 ]
+
+function formatTimezoneOffset(timezone: string): string {
+  const resolvedTimezone = timezone === 'system' ? getSystemTimezone() : timezone
+  if (!resolvedTimezone) return ''
+  try {
+    const parts = new Intl.DateTimeFormat('en-US', {
+      timeZone: resolvedTimezone,
+      timeZoneName: 'shortOffset',
+    }).formatToParts(new Date())
+    const offset = parts.find(part => part.type === 'timeZoneName')?.value || ''
+    if (offset === 'GMT') return 'UTC'
+    const match = offset.match(/^GMT([+-])(\d{1,2})(?::(\d{2}))?$/)
+    if (!match) return offset.replace(/^GMT/, 'UTC')
+    return `UTC${match[1]}${match[2].padStart(2, '0')}:${match[3] || '00'}`
+  } catch {
+    return ''
+  }
+}
+
+function formatTimezoneOptionLabel(option: { value: string; label: string }): string {
+  if (option.value === '') return option.label
+  if (option.value === 'system') {
+    const systemTimezone = getSystemTimezone()
+    const offset = formatTimezoneOffset('system')
+    return `跟随系统时区 (当前: ${systemTimezone}${offset ? `, ${offset}` : ''})`
+  }
+  const offset = formatTimezoneOffset(option.value)
+  return offset ? `${option.value} (${offset})` : option.value
+}
 
 const RESOLUTION_OPTIONS = [
   { value: '', label: '不设置' },
@@ -107,13 +141,11 @@ const RESOLUTION_OPTIONS = [
 
 const HARDWARE_CONCURRENCY_OPTIONS = [
   { value: '', label: '不设置' },
-  { value: '2', label: '2 核' },
-  { value: '4', label: '4 核' },
-  { value: '6', label: '6 核' },
-  { value: '8', label: '8 核' },
-  { value: '10', label: '10 核' },
-  { value: '12', label: '12 核' },
-  { value: '16', label: '16 核' },
+  { value: '8', label: '8 个逻辑处理器' },
+  { value: '12', label: '12 个逻辑处理器' },
+  { value: '16', label: '16 个逻辑处理器' },
+  { value: '24', label: '24 个逻辑处理器' },
+  { value: '32', label: '32 个逻辑处理器' },
 ]
 
 const WEBRTC_OPTIONS = [
@@ -157,7 +189,7 @@ const ADVANCED_ARG_HELP_ROWS = [
   { arg: '--accept-lang=<list>', usage: '语言列表；逗号分隔，按 navigator.languages 前缀比对', example: '--accept-lang=ja-JP,ja' },
   { arg: '--timezone=<iana>', usage: '时区；使用 IANA 时区名', example: '--timezone=Asia/Tokyo' },
   { arg: '--window-size=<w,h>', usage: '启动窗口外框尺寸；检测比对 outerWidth/outerHeight', example: '--window-size=1600,900' },
-  { arg: '--fingerprint-hardware-concurrency=<n>', usage: 'CPU 核心数；1 到 128 的整数', example: '--fingerprint-hardware-concurrency=8' },
+  { arg: '--fingerprint-hardware-concurrency=<n>', usage: '逻辑处理器数；1 到 128 的整数', example: '--fingerprint-hardware-concurrency=8' },
   { arg: '--disable-non-proxied-udp', usage: 'WebRTC 防泄漏；禁用非代理 UDP', example: '--disable-non-proxied-udp' },
   { arg: '--webrtc-ip-handling-policy=<policy>', usage: 'WebRTC 策略；用于更细的 IP 暴露控制', example: '--webrtc-ip-handling-policy=default_public_interface_only' },
   { arg: '--fingerprinting-canvas-image-data-noise', usage: '启用 Canvas ImageData 噪声；页面只能观察 Canvas Hash', example: '--fingerprinting-canvas-image-data-noise' },
@@ -188,6 +220,11 @@ function FingerprintSection({ title, children }: FingerprintSectionProps) {
 
 function EditableOptionInput({ value, onChange, options, placeholder }: EditableOptionInputProps) {
   const [open, setOpen] = useState(false)
+  const query = value.trim().toLowerCase()
+  const visibleOptions = options.filter(option => {
+    if (!query) return true
+    return option.value.toLowerCase().includes(query) || option.label.toLowerCase().includes(query)
+  })
 
   return (
     <div className="relative">
@@ -209,7 +246,7 @@ function EditableOptionInput({ value, onChange, options, placeholder }: Editable
       </button>
       {open && (
         <div className="absolute z-20 mt-1 max-h-56 w-full overflow-auto rounded-lg border border-[var(--color-border-default)] bg-[var(--color-bg-surface)] shadow-lg">
-          {options.map(option => (
+          {visibleOptions.map(option => (
             <button
               key={option.value}
               type="button"
@@ -223,6 +260,9 @@ function EditableOptionInput({ value, onChange, options, placeholder }: Editable
               {option.label}
             </button>
           ))}
+          {!visibleOptions.length && (
+            <div className="px-3 py-2 text-sm text-[var(--color-text-muted)]">可直接使用自定义值</div>
+          )}
         </div>
       )}
     </div>
@@ -250,11 +290,7 @@ export function FingerprintPanel({ value, onChange }: FingerprintPanelProps) {
     if (!presetId) return
     const preset = FINGERPRINT_PRESETS.find(p => p.id === presetId)
     if (!preset) return
-    const next: FingerprintConfig = {
-      ...preset.config,
-      seed: randomFingerprintSeed(),
-      unknownArgs: config.unknownArgs,
-    }
+    const next: FingerprintConfig = { ...buildFingerprintConfigFromPreset(preset), unknownArgs: config.unknownArgs }
     setConfig(next)
     onChange(serialize(next))
   }
@@ -416,11 +452,12 @@ export function FingerprintPanel({ value, onChange }: FingerprintPanelProps) {
           <FormItem label="语言列表">
             <EditableOptionInput value={config.acceptLang ?? ''} onChange={nextValue => update({ acceptLang: nextValue || undefined })} options={ACCEPT_LANG_OPTIONS} placeholder={config.lang ? `默认 ${config.lang.split(/[-_]/)[0] === config.lang ? config.lang : `${config.lang},${config.lang.split(/[-_]/)[0]}`}` : '如 ja-JP,ja'} />
           </FormItem>
-          <FormItem label="时区">
-            <Select
+          <FormItem label="时区" hint="常用值可直接选择，也可以输入任意受支持的 IANA 时区，例如 America/Indiana/Indianapolis">
+            <EditableOptionInput
               value={config.timezone ?? ''}
-              onChange={e => update({ timezone: e.target.value || undefined })}
-              options={TIMEZONE_OPTIONS.map(opt => opt.value === 'system' ? { ...opt, label: `跟随系统时区 (当前: ${getSystemTimezone()})` } : opt)}
+              onChange={nextValue => update({ timezone: nextValue || undefined })}
+              options={TIMEZONE_OPTIONS.map(option => ({ ...option, label: formatTimezoneOptionLabel(option) }))}
+              placeholder="如 America/New_York"
             />
           </FormItem>
         </div>
@@ -436,8 +473,13 @@ export function FingerprintPanel({ value, onChange }: FingerprintPanelProps) {
               <Input value={config.customResolution ?? ''} onChange={e => update({ customResolution: e.target.value || undefined })} placeholder="1920,1080" />
             </FormItem>
           )}
-          <FormItem label="CPU 核心数">
-            <Select value={config.hardwareConcurrency ?? ''} onChange={e => update({ hardwareConcurrency: e.target.value || undefined })} options={HARDWARE_CONCURRENCY_OPTIONS} />
+          <FormItem label="逻辑处理器数" hint="对应 navigator.hardwareConcurrency，不等同于 CPU 型号中的物理核心数；可直接输入 1 到 128 的整数">
+            <EditableOptionInput
+              value={config.hardwareConcurrency ?? ''}
+              onChange={nextValue => update({ hardwareConcurrency: nextValue || undefined })}
+              options={HARDWARE_CONCURRENCY_OPTIONS}
+              placeholder="如 16"
+            />
           </FormItem>
           <FormItem label="WebRTC 策略">
             <Select value={config.webrtcPolicy ?? ''} onChange={e => update({ webrtcPolicy: e.target.value || undefined })} options={WEBRTC_OPTIONS} />

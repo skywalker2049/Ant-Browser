@@ -44,7 +44,7 @@ var fingerprintStableArgLabels = map[string]string{
 	"--fingerprint-brand-version":              "品牌版本",
 	"--fingerprint-platform":                   "平台",
 	"--fingerprint-platform-version":           "系统版本",
-	"--fingerprint-hardware-concurrency":       "CPU 核心数",
+	"--fingerprint-hardware-concurrency":       "逻辑处理器数",
 	"--fingerprinting-canvas-image-data-noise": "Canvas ImageData",
 	"--fingerprinting-client-rects-noise":      "ClientRects",
 	"--lang":                                   "语言",

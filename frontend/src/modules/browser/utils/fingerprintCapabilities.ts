@@ -48,7 +48,7 @@ export const FINGERPRINT_CAPABILITIES: FingerprintCapabilityItem[] = [
     id: 'hardware',
     name: 'CPU',
     mode: 'configurable',
-    coverage: 'CPU 核心数已实测生效；设备内存、色深和触控点本地 Chrom-144 实测无效，不再作为运行参数传递',
+    coverage: '逻辑处理器数已实测生效；设备内存、色深和触控点本地 Chrom-144 实测无效，不再作为运行参数传递',
     args: ['--fingerprint-hardware-concurrency'],
   },
   {

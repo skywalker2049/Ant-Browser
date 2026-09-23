@@ -674,7 +674,7 @@ export function BrowserEditPage() {
               {locationResult && (
                 <div className="mt-2 text-xs text-[var(--color-text-muted)]">
                   {locationResult.ok
-                    ? `出口 ${locationResult.ip || '-'} · ${[locationResult.country, locationResult.region, locationResult.city].filter(Boolean).join(' / ') || '-'} · ${locationResult.lang} · ${locationResult.timezone}`
+                    ? `出口 ${locationResult.ip || '-'} · ${[locationResult.country, locationResult.region, locationResult.city].filter(Boolean).join(' / ') || '-'} · ${locationResult.lang} · ${locationResult.timezone}${locationResult.timezoneSource && locationResult.timezoneSource !== 'ip' ? `（${locationResult.timezoneSource === 'city' ? '城市推断' : '国家推断'}）` : ''}`
                     : locationResult.error || '未匹配到定位'}
                 </div>
               )}
@@ -861,7 +861,7 @@ export function BrowserEditPage() {
               <FingerprintCheckRow label="语言" expected={fingerprintCheckResult.expected.language} actual={fingerprintCheckResult.runtime.language} />
               <FingerprintCheckRow label="语言列表" expected={fingerprintCheckResult.expected.acceptLanguage} actual={fingerprintCheckResult.runtime.languages} />
               <FingerprintCheckRow label="时区" expected={fingerprintCheckResult.expected.timezone} actual={fingerprintCheckResult.runtime.timezone} />
-              <FingerprintCheckRow label="CPU 核心" expected={fingerprintCheckResult.expected.hardwareConcurrency} actual={fingerprintCheckResult.runtime.hardwareConcurrency} />
+              <FingerprintCheckRow label="逻辑处理器" expected={fingerprintCheckResult.expected.hardwareConcurrency} actual={fingerprintCheckResult.runtime.hardwareConcurrency} />
               <FingerprintDisplayRow label="设备内存" actual={fingerprintCheckResult.runtime.deviceMemory} />
               <FingerprintDisplayRow label="颜色深度" actual={fingerprintCheckResult.runtime.colorDepth} />
               <FingerprintDisplayRow label="触控点" actual={fingerprintCheckResult.runtime.maxTouchPoints} />

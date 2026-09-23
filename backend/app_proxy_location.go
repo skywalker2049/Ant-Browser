@@ -5,23 +5,25 @@ import (
 	"fmt"
 	"strings"
 	"time"
+	_ "time/tzdata"
 )
 
 type ProxyLocationResolveResult struct {
-	ProxyId    string                `json:"proxyId"`
-	Ok         bool                  `json:"ok"`
-	Auto       bool                  `json:"auto"`
-	Source     string                `json:"source"`
-	Error      string                `json:"error"`
-	IP         string                `json:"ip"`
-	Country    string                `json:"country"`
-	Region     string                `json:"region"`
-	City       string                `json:"city"`
-	Timezone   string                `json:"timezone"`
-	Lang       string                `json:"lang"`
-	Health     *ProxyIPHealthResult  `json:"health,omitempty"`
-	Alternates []ProxyLocationOption `json:"alternates,omitempty"`
-	ResolvedAt string                `json:"resolvedAt"`
+	ProxyId        string                `json:"proxyId"`
+	Ok             bool                  `json:"ok"`
+	Auto           bool                  `json:"auto"`
+	Source         string                `json:"source"`
+	Error          string                `json:"error"`
+	IP             string                `json:"ip"`
+	Country        string                `json:"country"`
+	Region         string                `json:"region"`
+	City           string                `json:"city"`
+	Timezone       string                `json:"timezone"`
+	TimezoneSource string                `json:"timezoneSource"`
+	Lang           string                `json:"lang"`
+	Health         *ProxyIPHealthResult  `json:"health,omitempty"`
+	Alternates     []ProxyLocationOption `json:"alternates,omitempty"`
+	ResolvedAt     string                `json:"resolvedAt"`
 }
 
 type ProxyLocationOption struct {
@@ -104,20 +106,26 @@ func (a *App) cachedProxyIPHealthResult(proxyId string) (ProxyIPHealthResult, bo
 func buildProxyLocationResolveResult(proxyId string, health ProxyIPHealthResult, source string, resolvedAt string) ProxyLocationResolveResult {
 	countryCode := resolveProxyLocationCountryCode(health)
 	option := resolveProxyLocationOption(countryCode, health.Country, health.City)
+	timezoneSource := resolveProxyLocationTimezoneSource(countryCode, health.Country, health.City)
+	if timezone := resolveProxyTimezoneFromRawData(health.RawData); timezone != "" {
+		option.Timezone = timezone
+		timezoneSource = "ip"
+	}
 	ok := health.Ok && option.Timezone != "" && option.Lang != ""
 	result := ProxyLocationResolveResult{
-		ProxyId:    proxyId,
-		Ok:         ok,
-		Auto:       ok,
-		Source:     source,
-		IP:         health.IP,
-		Country:    health.Country,
-		Region:     health.Region,
-		City:       health.City,
-		Timezone:   option.Timezone,
-		Lang:       option.Lang,
-		Health:     &health,
-		ResolvedAt: resolvedAt,
+		ProxyId:        proxyId,
+		Ok:             ok,
+		Auto:           ok,
+		Source:         source,
+		IP:             health.IP,
+		Country:        health.Country,
+		Region:         health.Region,
+		City:           health.City,
+		Timezone:       option.Timezone,
+		TimezoneSource: timezoneSource,
+		Lang:           option.Lang,
+		Health:         &health,
+		ResolvedAt:     resolvedAt,
 	}
 	if !ok {
 		result.Error = fmt.Sprintf("无法根据地区自动匹配定位：%s %s", strings.TrimSpace(health.Country), strings.TrimSpace(health.City))
@@ -140,6 +148,55 @@ func resolveProxyLocationOption(countryCode string, country string, city string)
 		option.Timezone = timezone
 	}
 	return option
+}
+
+func resolveProxyLocationTimezoneSource(countryCode string, country string, city string) string {
+	countryCode = normalizeCountryCode(countryCode)
+	if countryCode == "" {
+		countryCode = normalizeCountryCode(country)
+	}
+	if countryCode == "" {
+		return ""
+	}
+	if cityTimezoneDefaults[countryCode+"|"+strings.ToLower(strings.TrimSpace(city))] != "" {
+		return "city"
+	}
+	if countryLocaleDefaults[countryCode].Timezone != "" {
+		return "country"
+	}
+	return ""
+}
+
+func resolveProxyTimezoneFromRawData(data map[string]interface{}) string {
+	if data == nil {
+		return ""
+	}
+	for _, key := range []string{"timezone", "timeZone", "time_zone", "timezoneId", "timezone_id", "tz"} {
+		if timezone := validProxyTimezone(mapString(data, key)); timezone != "" {
+			return timezone
+		}
+	}
+	for _, key := range []string{"location", "geo", "geolocation"} {
+		nested, ok := data[key].(map[string]interface{})
+		if !ok {
+			continue
+		}
+		if timezone := resolveProxyTimezoneFromRawData(nested); timezone != "" {
+			return timezone
+		}
+	}
+	return ""
+}
+
+func validProxyTimezone(value string) string {
+	value = strings.TrimSpace(value)
+	if value == "" || strings.EqualFold(value, "local") {
+		return ""
+	}
+	if _, err := time.LoadLocation(value); err != nil {
+		return ""
+	}
+	return value
 }
 
 func resolveProxyLocationCountryCode(health ProxyIPHealthResult) string {
@@ -201,8 +258,15 @@ func defaultProxyLocationOptions() []ProxyLocationOption {
 	return []ProxyLocationOption{
 		countryLocaleDefaults["US"],
 		countryLocaleDefaults["GB"],
+		countryLocaleDefaults["DE"],
 		countryLocaleDefaults["JP"],
+		countryLocaleDefaults["KR"],
 		countryLocaleDefaults["SG"],
+		countryLocaleDefaults["HK"],
+		countryLocaleDefaults["TW"],
+		countryLocaleDefaults["IN"],
+		countryLocaleDefaults["CA"],
+		countryLocaleDefaults["RU"],
 		countryLocaleDefaults["CN"],
 	}
 }

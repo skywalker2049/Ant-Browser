@@ -15,7 +15,7 @@ export const BROWSER_PROFILE_AUTOMATION_TARGET_OPTIONS: BrowserProfileAutomation
   { value: 'identity', label: '浏览器身份', detail: '品牌 / 平台' },
   { value: 'locale', label: '语言与时区', detail: '语言 / 时区' },
   { value: 'screen', label: '窗口大小', detail: '浏览器窗口' },
-  { value: 'hardware', label: '硬件参数', detail: 'CPU 核心数' },
+  { value: 'hardware', label: '硬件参数', detail: '逻辑处理器数' },
   { value: 'network', label: '网络与伪装', detail: 'WebRTC / 排除伪装' },
 ]
 
